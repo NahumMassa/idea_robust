@@ -1,10 +1,12 @@
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
+
 from dotenv import load_dotenv
 import psycopg2 as pg
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 @contextmanager
 def get_db_cursor():
