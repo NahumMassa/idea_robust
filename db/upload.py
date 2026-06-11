@@ -3,7 +3,7 @@ from connect import get_db_cursor # Importamos el gestor de cursor
 import create_setlist as cl 
 from psycopg2 import extras 
 
-def _get_timestamp_for_Sunday()->str:
+def get_timestamp_for_Sunday()->str:
     """
     gets the Sunday date to upload it to the db 
     """
@@ -25,7 +25,7 @@ def _create_table_perfomance(title:list, artist:list)->list:
     This function creates the table with the songs and the date when they were played.
     we only need the titles and the date
     """
-    sunday_date = _get_timestamp_for_Sunday()
+    sunday_date = get_timestamp_for_Sunday()
     #we only need the titles
     return [(title, artist, sunday_date) for title, artist in zip(title, artist)] 
 

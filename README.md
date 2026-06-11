@@ -74,4 +74,7 @@ Dada la naturaleza de la información, estos tiene que ser llenados a manos. Par
 ### Cómo se hizo la migración?
 1. Creación script ETL de Notion -> PostgreSQL
 Se hizo un script de python para poder extraer los datos de Notion y subirlos a la base de datos en PostgreSQL.
-Hay un problema mayor co
+
+
+## Por qué dos formar de conexión la db?
+Es impráctico, y complica la lógica el tener la conexión tanto con psycopg2, como con streamlit, que uso sqlalchmy debajo del capó. Esto se hizo meramente para poder aprender una herramienta de conexión de más bajo nivel (psycopg) pero saber como se hace de manera más simple con stremlit
