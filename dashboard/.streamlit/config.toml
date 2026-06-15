@@ -1,0 +1,78 @@
+# Streamlit config — Setlist Dashboard (Iglesia Dios es Amor Mérida)
+# Docs: https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+# Most color changes apply on save; restart the app if something does not update.
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+
+# ---------------------------------------------------------------------------
+# Default theme (used when the user has not picked light/dark in the menu)
+# ---------------------------------------------------------------------------
+[theme]
+base = "light"
+primaryColor = "#B8860B"              # warm gold — buttons, links, accents
+backgroundColor = "#FAF7F2"             # soft cream page background
+secondaryBackgroundColor = "#F0EBE3"    # widgets, metric blocks, code areas
+textColor = "#2C2C2C"                   # main body text
+font = "sans serif"
+baseRadius = "0.75rem"
+buttonRadius = "0.5rem"
+showSidebarBorder = true
+showWidgetBorder = false
+borderColor = "#E3DACE"
+
+# Chart colors (Plotly, Altair, Vega-Lite)
+chartCategoricalColors = ["#B8860B", "#5B7C99", "#8FBC8F", "#CD853F", "#6A5ACD"]
+
+# ---------------------------------------------------------------------------
+# Light mode overrides
+# ---------------------------------------------------------------------------
+[theme.light]
+primaryColor = "#B8860B"
+backgroundColor = "#FAF7F2"
+secondaryBackgroundColor = "#F0EBE3"
+textColor = "#2C2C2C"
+
+[theme.light.sidebar]
+backgroundColor = "#F3EDE4"
+secondaryBackgroundColor = "#EAE2D6"
+textColor = "#2C2C2C"
+
+# ---------------------------------------------------------------------------
+# Dark mode overrides (toggle via Streamlit menu: Settings → Theme)
+# ---------------------------------------------------------------------------
+[theme.dark]
+primaryColor = "#D4AF37"
+backgroundColor = "#1E1E1E"
+secondaryBackgroundColor = "#2A2A2A"
+textColor = "#F5F5F5"
+
+[theme.dark.sidebar]
+backgroundColor = "#171717"
+secondaryBackgroundColor = "#242424"
+textColor = "#F5F5F5"
+
+# ---------------------------------------------------------------------------
+# Sidebar (applies to the active theme unless overridden above)
+# ---------------------------------------------------------------------------
+[theme.sidebar]
+primaryColor = "#B8860B"
+
+# ---------------------------------------------------------------------------
+# Optional: custom fonts (requires server.enableStaticServing = true)
+# Place font files in dashboard/static/ and uncomment the block below.
+# ---------------------------------------------------------------------------
+# [server]
+# enableStaticServing = true
+#
+# [[theme.fontFaces]]
+# family = "Inter"
+# url = "app/static/Inter-Regular.woff2"
+# weight = 400
+# style = "normal"
+#
+# [theme]
+# font = "Inter"

@@ -1,6 +1,3 @@
-
-
-
 import sys
 import os
 
@@ -13,12 +10,6 @@ import argparse
 from db.create_setlist import format
 from db.upload import upload_and_format
 from call_nano import nano_editor
-
-
-
-
-
-
 
 blueprint = """
 #title
