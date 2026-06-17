@@ -95,5 +95,5 @@ def upload_and_format(text:str):
     
 
 if __name__ == "__main__":
-    upload_and_format(cl.text2)
+    upload_and_format(cl.text3)
     

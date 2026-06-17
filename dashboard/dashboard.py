@@ -1,6 +1,4 @@
-from datetime import datetime, timedelta
 import streamlit as st
-import matplotlib.pyplot as plt
 
 st.set_page_config(
     page_title="IDEA",
@@ -11,12 +9,6 @@ conn = st.connection("postgres", type="sql")
 st.subheader("Setlist Dashboard de la Iglesia Dios es Amor Mérida")
 st.sidebar.success("Selecciona una página para navegar")
 
-def get_upcoming_sunday() -> str:
-    today = datetime.now()
-    remaining_days = 6 - today.weekday()
-    return (today + timedelta(days=remaining_days)).strftime("%Y-%m-%d")
-
-sunday = get_upcoming_sunday()
 
 #query returns a pandas dataframe 
 kpis = conn.query("""
@@ -39,23 +31,56 @@ with col2:
 with col3:
     st.metric("Tonos", int(kpis["total_tones"]))
 
-#----------------
-# SONGS FOR THIS SUNDAY
-#----------------
 
 
-songs_for_sunday = conn.query("""
-SELECT
-    s.title AS título,
-    a.name AS artista,
-    s.tempo,
-    s.link_yt AS link
-FROM performance p
-INNER JOIN songs s ON s.id = p.song_id
-INNER JOIN artist a ON a.id = p.artist_id
-WHERE p.played_at = :played_at
-""", params={"played_at": sunday})
+query = """
+SELECT 
+    COUNT(*) AS total_canciones, 
+    a.name AS artista
+FROM songs s 
+INNER JOIN artist a ON s.artist_id = a.id 
+GROUP BY a.name 
+ORDER BY total_canciones DESC 
+LIMIT 5;
+"""
 
-st.subheader(f"Setlist del domingo ({sunday})")
-st.dataframe(songs_for_sunday, width="stretch", hide_index=True)
+query_top_tones = """
+SELECT 
+    COUNT(*) AS total_canciones, 
+    s.tone AS tono
+FROM songs s 
+GROUP BY s.tone
+ORDER BY total_canciones DESC
+LIMIT 5;
+"""
 
+query_songs_genre = """
+    SELECT 
+        COUNT(*) AS total_canciones,
+        g.name AS genre
+    FROM songs s
+    JOIN genre g ON s.genre_id = g.id
+    GROUP BY g.name
+    ORDER BY total_canciones DESC
+    LIMIT 5;
+"""
+
+most_songs_per_artist = conn.query(query)
+query_top_tones = conn.query(query_top_tones)
+query_songs_genre = conn.query(query_songs_genre)
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.subheader("Top 5 artistas con más canciones")
+    st.bar_chart(most_songs_per_artist, y="total_canciones", x="artista")
+    
+with col2:
+    st.subheader("Top 5 Tonos más tocadas")
+    st.bar_chart(query_top_tones, y="total_canciones", x="tono")
+    
+with col3:
+    st.subheader("Canciones por género")
+    st.bar_chart(query_songs_genre, y="total_canciones", x="genre")
+
+    

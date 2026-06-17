@@ -79,6 +79,26 @@ text2 = """
     https://www.youtube.com/watch?v=O6JrDUyeVV4&list=PLFFUlmL5xmATnbG9wr_4SxaQom9Y0PZjk&index=8
     https://www.youtube.com/watch?v=izxfXTvv67U
   """
+text3 = """
+Eres Señor Vencedor
+Abba Padre
+Él es más grande
+El poderoso de Israel
+Grande y fuerte (Proezas)
+---
+Juan Carlos Alvarado
+Marco Barrientos
+Avivamiento
+Juan Carlos Alvarado
+Miel San Marcos
+---
+https://youtu.be/YgzL38Uh3z0?si=RwJbv-TRYr0CArYO
+https://youtu.be/TzC42TFbB2Y?si=R4uiW-9e4d96t1XZ
+https://www.youtube.com/watch?v=c_7xEmW8RxM
+https://youtu.be/2cbVxPKaik4?si=fjG4yF0niQUsG_TO
+https://youtu.be/WZC9RAk7dOI?si=ma74qgy1Kc5PNkRy
+"""
+
 if __name__ == "__main__":
   titles, artists, links = format(text2)  
   print(titles,artists,links)
