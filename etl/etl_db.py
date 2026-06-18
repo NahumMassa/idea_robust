@@ -7,7 +7,7 @@ from psycopg2 import extras #para poder insertar valores
 conn = pg.connect('dbname=postgres user=postgres password=mypassword host=localhost port=5432')
 cur = conn.cursor()
 
-path = 'setlist.csv'
+path = 'Setlist_completo.csv'
 
 
 def sql_query(query:str ):

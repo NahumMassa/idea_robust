@@ -1,12 +1,16 @@
 import streamlit as st
 
+
 st.set_page_config(
     page_title="IDEA",
     page_icon="✝️",
 )
 conn = st.connection("postgres", type="sql")
 
-st.subheader("Setlist Dashboard de la Iglesia Dios es Amor Mérida")
+
+
+st.title("IDEA Mérida Ministerio de Alabanza")
+st.subheader("Dashboard Setlist")
 st.sidebar.success("Selecciona una página para navegar")
 
 
