@@ -1,14 +1,20 @@
-
+import os 
 import pandas as pd
 import psycopg2 as pg 
 from psycopg2 import extras #para poder insertar valores 
+from dotenv import load_dotenv
 
 
-conn = pg.connect('dbname=postgres user=postgres password=password host=127.0.0.1 port=5432')
+load_dotenv()
+
+conn = pg.connect(f"dbname={os.getenv('DB_NAME')} user={os.getenv('DB_USER')} password={os.getenv('DB_PASSWORD')} host={os.getenv('DB_HOST')} port={os.getenv('DB_PORT')}")
 cur = conn.cursor()
 
-path = 'Setlist_completo.csv'
+if cur:
+    print("connected to db")
 
+
+path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Setlist_completo.csv')
 
 def sql_query(query:str ):
     cur.execute(query)
@@ -19,81 +25,84 @@ def create_table(query:str, cur=cur, conn=conn, ):
     cur.execute(query)
     conn.commit()
 
+#-----------------------
+#tables schemas
+#-----------------------
 
-artist_table = "CREATE TABLE IF NOT EXISTS artist (\
-    id SERIAL PRIMARY KEY, \
-    name VARCHAR(60) UNIQUE NOT NULL \
-    )"
-  
+schema = """
+CREATE TABLE IF NOT EXISTS artist (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(60) UNIQUE NOT NULL
+);
 
-genre_table = """
 CREATE TABLE IF NOT EXISTS genre (
-    id serial PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL
-    );
-"""
+);
 
-songs_table = """
 CREATE TABLE IF NOT EXISTS songs (
-    id Serial PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     title VARCHAR(60),
     artist_id INTEGER REFERENCES artist(id),
     genre_id INTEGER REFERENCES genre(id),
-    tempo INTEGER CHECK (tempo>0),
+    tempo INTEGER CHECK (tempo > 0),
     tone VARCHAR(10),
-    link_yt TEXT
+    link_yt TEXT,
+    UNIQUE (title, link_yt)
+);
+
+CREATE TABLE IF NOT EXISTS performance (
+    id SERIAL PRIMARY KEY,
+    song_id INTEGER REFERENCES songs(id),
+    artist_id INTEGER REFERENCES artist(id),
+    played_at DATE DEFAULT CURRENT_DATE,
+    UNIQUE (played_at, song_id)
 );
 """
-performance_table = """
-CREATE TABLE IF NOT EXISTS performance (
-    id SERIAL PRIMARY KEY, 
-    song_id INTEGER REFERENCES songs(id),
-    played_at DATE DEFAULT CURRENT_DATE
-    );
-"""
 
-create_table(artist_table)
-create_table(genre_table)
-create_table(songs_table) 
-create_table(performance_table)
+# Creates all tables in a single query execution
+create_table(schema)
 
 
+#-----------------------
+# dataframes processing
+#-----------------------
 
 setlist = pd.read_csv(path)
-setlist.keys()
-
 
 setlist = setlist.drop('To-play', axis=1) #esta columna ya no la vamos a necesitar
+setlist = setlist.drop(['LastPlay', 'TimesPlayed'], axis=1)
 
-setlist['Artist'] = setlist['Artist'].str.title() #CLEAN ALL NAMES TO MAKE UNIFORM
-artist = setlist['Artist'].unique().dropna() 
+#-------------------------
+# artists
+#-------------------------
+
+#CLEAN ALL NAMES TO MAKE UNIFORM
+
+setlist = setlist.drop('To-play', axis=1) #esta columna ya no la vamos a necesitar
+setlist['Artist'] = setlist['Artist'].str.strip() #remove empty strings and white spaces
+setlist['Artist'] = setlist['Artist'].str.title() #Le hacemos un title para tener el mismo formato
+artist_tuple= [(artist, ) for artist in setlist['Artist'].unique().dropna()]
 
 
-artist_list = list(artist)
-artist_list
 
-
-db_artist = sql_query('SELECT * FROM artist')
-
-db_artist = [(artist[1], ) for artist in db_artist]
-db_artist
 
 query = """
     INSERT INTO artist (name) 
     VALUES %s
     ON CONFLICT (name) DO NOTHING;
 """
-extras.execute_values(cur, query, db_artist)
+extras.execute_values(cur, query, artist_tuple)
 conn.commit()
     
-conn.commit()
 
 
-genres = setlist['Genre'].value_counts()
-genres
-
-genres = setlist['Genre'].unique().dropna()
-genres_tuple = [(genre, ) for genre in genres] #psycopg mmangaes list of tuples
+#------------------------
+#genres
+#------------------------
+setlist['Genre'] = setlist['Genre'].str.title()
+setlist['Genre'] = setlist['Genre'].str.strip()
+genres_tuple = [(genre, ) for genre in setlist['Genre'].unique().dropna()]
 
 cur.executemany("""
     INSERT INTO genre (name)
@@ -101,6 +110,12 @@ cur.executemany("""
     ON CONFLICT DO NOTHING;
 """, genres_tuple)
 conn.commit()
+
+
+
+#------------------------
+#songs
+#------------------------
 
 rows_with_nan = setlist[setlist.isna().any(axis=1)]
 print(f"hay {len(rows_with_nan)} filas con Nan que deben ser filtrados")
@@ -137,6 +152,6 @@ except Exception as e:
 
 
 
-rows_with_nan.to_csv("Rows To Clean")
+rows_with_nan.to_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Rows To Clean"))
 
 

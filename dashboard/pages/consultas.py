@@ -155,4 +155,4 @@ st.write("Esta sección está en construcción... Pero aquí podrás poner tus s
 sugerencia = st.text_input("Sugerencia")
 
 if st.button("Enviar sugerencia"):
-    st.write(f"Ok, gracias por tu sugerencia, pero todavía sirve  JAJAJAJAJ: {sugerencia}")
+    st.write(f"Ok, gracias por tu sugerencia, pero todavía no sirve  JAJAJAJAJ: {sugerencia}")
