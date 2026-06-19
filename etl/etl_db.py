@@ -4,7 +4,7 @@ import psycopg2 as pg
 from psycopg2 import extras #para poder insertar valores 
 
 
-conn = pg.connect('dbname=postgres user=postgres password=mypassword host=localhost port=5432')
+conn = pg.connect('dbname=postgres user=postgres password=password host=127.0.0.1 port=5432')
 cur = conn.cursor()
 
 path = 'Setlist_completo.csv'

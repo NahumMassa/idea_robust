@@ -45,6 +45,63 @@ st.dataframe(songs_for_sunday, width="stretch", hide_index=True)
 
 conn = st.connection("postgres", type="sql")
 
-#----------------
-# FORMAT A LIST
-#----------------
+#-----------------------
+# FADD A NEW SONG
+#----------------------
+
+mode = ['Mayor', 'Menor']
+tones = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F']
+
+
+#TÍTULO------------------------------
+title = st.text_input("Título")
+title = title.title().strip()
+
+#ARTISTA-----------------------------
+check_artist = st.checkbox("Agregar artista ya existente")
+if check_artist:    
+    st.write("Va a agregar un artista ya existente de la base de datos")
+    artist_list = conn.query("SELECT name FROM artist")
+    artist = st.selectbox("Artista", artist_list)
+else:
+    artist = st.text_input("Nuevo artista")
+    artist = artist.title().strip()
+
+#GENRE------------------------------
+genres = conn.query("SELECT name FROM genre")
+genre = st.selectbox("Género", genres)
+
+#TEMPO------------------------------
+tempo = st.slider("Tempo", 40, 250)
+
+#TONO--------------------------------
+tone_selected = st.selectbox("Tono", tones)
+mode_selected = st.selectbox("Modo", mode)
+tone_complete = tone_selected + mode_selected
+
+link = st.text_input("Link de YouTube")
+link = link.strip()
+
+
+# Usamos un botón normal
+submit_button = st.button("Subir canción")
+
+if submit_button:
+    # Código para insertar...
+
+
+    
+    
+
+    pass
+    
+    if submit_button:
+        conn.execute("""
+            INSERT INTO songs (title, artist_id, genre_id, tempo, tone, link_yt) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (title, artist, genre, tempo, tone, link))
+        conn.commit()
+        st.success("Canción agregada correctamente")
+
+
+
