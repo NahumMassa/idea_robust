@@ -12,7 +12,7 @@ db_name = os.environ.get("DB_NAME", "postgres")
 url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 # Ensure .streamlit directory exists in dashboard folder
-secrets_dir = Path("dashboard/.streamlit")
+secrets_dir = Path(".streamlit")
 secrets_dir.mkdir(parents=True, exist_ok=True)
 secrets_file = secrets_dir / "secrets.toml"
 

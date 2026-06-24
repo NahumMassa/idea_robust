@@ -4,10 +4,6 @@ from datetime import timedelta
 from datetime import datetime
 from pathlib import Path
 
-# Cambiar al directorio 'dashboard' para que streamlit encuentre la carpeta .streamlit y sus secretos
-dashboard_dir = Path(__file__).resolve().parent.parent
-os.chdir(dashboard_dir)
-
 st.set_page_config(page_title="Setlist Domingo", page_icon="🎼")
 
 conn = st.connection("postgres", type="sql")
