@@ -5,6 +5,21 @@
 2. Dashboard interactivo en streamlit
 3. Program de CLI para subir y dar formato al setlist 
 
+## Arquitectura de Despliegue y Seguridad (Homelab V1)
+El proyecto se despliega en un entorno de homelab autoalojado sobre **Proxmox** utilizando una arquitectura de contenedores anidados (**Nested LXC**).
+
+### Componentes de la Arquitectura
+1. **Entorno de Virtualización (Proxmox + Nested LXC)**:
+   * Se utiliza un contenedor LXC en Proxmox configurado con soporte para anidación (*nesting*).
+   * Dentro de este contenedor LXC se ejecuta el motor de **Docker**.
+2. **Servicios de Docker (Docker Compose)**:
+   * **Contenedor `db` (PostgreSQL)**: Almacena la base de datos relacional y expone el puerto para la ejecución local del ETL.
+   * **Contenedor `dashboard` (Streamlit)**: Servidor de la aplicación web interactiva que se conecta de manera directa y segura al contenedor `db`.
+3. **Acceso y Seguridad (Cloudflare Tunnel)**:
+   * Toda la comunicación externa hacia el dashboard se canaliza a través de un **Cloudflare Tunnel** seguro.
+   * Esto permite acceder a la aplicación desde internet sin abrir puertos en el router del hogar, garantizando encriptación de extremo a extremo y la posibilidad de añadir autenticación (por ejemplo, Cloudflare Access o mTLS) en la capa del túnel.
+
+
 ## Objetivo de la migración
 El objetivo de esta migración es poder tener más control de manera histórica de las canciones que se tocan en los servicios y de los usuarios que las solicitan. 
 Poder sacar métricas de:

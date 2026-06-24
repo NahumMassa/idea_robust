@@ -1,0 +1,32 @@
+import os
+from pathlib import Path
+
+# Extract environment variables with fallback defaults
+db_user = os.environ.get("DB_USER", "postgres")
+db_password = os.environ.get("DB_PASSWORD", "idea_robust_password_123")
+db_host = os.environ.get("DB_HOST", "db")
+db_port = os.environ.get("DB_PORT", "5432")
+db_name = os.environ.get("DB_NAME", "postgres")
+
+# Generate the connection URL
+url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+# Ensure .streamlit directory exists in dashboard folder
+secrets_dir = Path("dashboard/.streamlit")
+secrets_dir.mkdir(parents=True, exist_ok=True)
+secrets_file = secrets_dir / "secrets.toml"
+
+# Write the secrets.toml configuration file
+content = f"""[postgres]
+DB_NAME = "{db_name}"
+DB_USER = "{db_user}"
+DB_PASSWORD = "{db_password}"
+DB_HOST = "{db_host}"
+DB_PORT = {db_port}
+
+[connections.postgres]
+url = "{url}"
+"""
+
+secrets_file.write_text(content)
+print(f"entrypoint.py: Generated secrets.toml pointing to {db_host}:{db_port}")
