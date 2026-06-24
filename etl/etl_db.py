@@ -79,7 +79,6 @@ setlist = setlist.drop(['LastPlay', 'TimesPlayed'], axis=1)
 
 #CLEAN ALL NAMES TO MAKE UNIFORM
 
-setlist = setlist.drop('To-play', axis=1) #esta columna ya no la vamos a necesitar
 setlist['Artist'] = setlist['Artist'].str.strip() #remove empty strings and white spaces
 setlist['Artist'] = setlist['Artist'].str.title() #Le hacemos un title para tener el mismo formato
 artist_tuple= [(artist, ) for artist in setlist['Artist'].unique().dropna()]

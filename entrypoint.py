@@ -11,7 +11,7 @@ db_name = os.environ.get("DB_NAME", "postgres")
 # Generate the connection URL
 url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-# Ensure .streamlit directory exists in dashboard folder
+# Ensure .streamlit directory exists in root folder and write secrets
 secrets_dir = Path(".streamlit")
 secrets_dir.mkdir(parents=True, exist_ok=True)
 secrets_file = secrets_dir / "secrets.toml"
@@ -34,4 +34,12 @@ password = "{db_password}"
 """
 
 secrets_file.write_text(content)
-print(f"entrypoint.py: Generated secrets.toml pointing to {db_host}:{db_port}")
+
+# Ensure .streamlit directory exists in dashboard folder and write secrets
+dashboard_secrets_dir = Path("dashboard/.streamlit")
+dashboard_secrets_dir.mkdir(parents=True, exist_ok=True)
+dashboard_secrets_file = dashboard_secrets_dir / "secrets.toml"
+dashboard_secrets_file.write_text(content)
+
+print(f"entrypoint.py: Generated secrets.toml in root and dashboard pointing to {db_host}:{db_port}")
+
