@@ -25,7 +25,12 @@ DB_HOST = "{db_host}"
 DB_PORT = {db_port}
 
 [connections.postgres]
-url = "{url}"
+dialect = "postgresql"
+host = "{db_host}"
+port = {db_port}
+database = "{db_name}"
+username = "{db_user}"
+password = "{db_password}"
 """
 
 secrets_file.write_text(content)
