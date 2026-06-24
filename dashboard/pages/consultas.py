@@ -22,8 +22,8 @@ song_title= st.text_input("ingresa el nombre de la canción").title()
 if song_title:
 
     query_song_by_title = conn.query(
-        "SELECT * FROM songs WHERE title = :title",
-        params={"title": song_title},
+        "SELECT * FROM songs WHERE title LIKE :title",
+        params={"title": f"%{song_title}%"},
     )
     if not query_song_by_title.empty:
         st.dataframe(query_song_by_title, hide_index=True)
