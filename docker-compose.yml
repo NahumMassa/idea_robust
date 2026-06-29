@@ -37,5 +37,23 @@ services:
     environment:
       - DB_HOST=db
 
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    container_name: idea_robust_cli
+    stdin_open: true
+    tty: true
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+    volumes:
+      - .:/app
+    entrypoint: ["python", "cli_program/setlistcli.py"]
+
 volumes:
   postgres_data:

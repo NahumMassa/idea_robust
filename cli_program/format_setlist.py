@@ -1,17 +1,20 @@
 
 import re
+from datetime import datetime, timedelta
 
-def _print_table(songs, artists, links):
+
+
+def print_table(songs, artists, links):
     # HEADER con f-strings alineados (útil para visualización de datos en consola)
-    print(f"{'CANCIÓN'} | {'ARTISTA'} | {'LINK'}")
+    print(f"{'*CANCIÓN*'} | {'*ARTISTA*'} | {'*LINK*'}")
     print("-" * 20)
 
     # zip() es O(n) y mucho más limpio que usar rangos e índices
     for song, artist, link in zip(songs, artists, links):
-        print(f"{song} | {artist} | {link}")
+        print(f"> {song} | {artist} | {link}")
 
-
-def format(text):
+    
+def get_data_from_text(text):
   songs = []
   artists = []
   links = []
@@ -34,8 +37,44 @@ def format(text):
         else:
           links.append(line)
 
-  _print_table(songs, artists, links)
   return (songs, artists, links)
+
+
+
+def get_timestamp_for_Sunday()->str:
+    """
+    gets the Sunday date to upload it to the db 
+    """
+    #the number for the Sunday
+    SUNDAY = 6 
+    today = datetime.now()
+
+    #0 = mon, 1 = tue, 2=wed, 3=thu, 4=fri, 5=sat, 6=sun
+    day_n = today.weekday() 
+    remaining_days = SUNDAY - day_n
+
+    #get the te date of Sunday
+    sunday_date = (today + timedelta(days=remaining_days)).strftime("%Y-%m-%d") 
+    #POSTGRES USES ISO 8601 format (YYYY-MM-DD)
+    return sunday_date
+
+
+        
+def create_tuples_for_performance(setlist: tuple[list[str], list[str]], sunday_date)->list:
+    """
+    This function creates the table with the songs and the date when they were played.
+    we only need the titles and the date
+    """
+    title,artist = setlist
+    if title is None or artist is None: 
+        raise ValueError("Make sure the input text has a valid format")
+
+    #if no date is provided, get the timestamp for Sunday
+    if sunday_date is None:
+      sunday_date = str(get_timestamp_for_Sunday())
+      
+    return [(title, artist, sunday_date) for title, artist in zip(title, artist)] 
+
 
 
 
@@ -100,5 +139,15 @@ https://youtu.be/WZC9RAk7dOI?si=ma74qgy1Kc5PNkRy
 """
 
 if __name__ == "__main__":
-  titles, artists, links = format(text2)  
-  print(titles,artists,links)
+  data = get_data_from_text(text2)
+  print_table(data[0], data[1], data[2])
+  
+  print("---------------------------------------")
+  #with the correct format for the db (title,artist,link)
+  setlist_with_date  = create_tuples_for_performance(data, None)
+  print(setlist_with_date)
+
+  print("---------------------------------------")
+  #if no date is provided, get the timestamp for Sunday
+  setlist_no_date =  create_tuples_for_performance(data, "2026-01-05")
+  print(setlist_no_date)
