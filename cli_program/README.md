@@ -36,25 +36,25 @@ Ensure your python virtual environment is active and psycopg2 dependencies are i
 
 Run the program from the repository root:
 ```bash
-docker compose run --rm cli --mode upload
+docker compose -f docker/docker-compose.yml run --rm cli --mode upload
 
 python cli_program/setlistcli.py [OPTIONS]
 ```
 
 ### Running with Docker
 
-Since the program is integrated into your `docker-compose.yml`, you can run it inside a Docker container without setting up a local Python environment.
+Since the program is integrated into your `docker/docker-compose.yml`, you can run it inside a Docker container without setting up a local Python environment.
 
-Run the service using `docker compose run` (which will mount your workspace so scripts update dynamically, keep stdin open, and allocate a tty so `nano` works):
+Run the service using `docker compose run` (pointing to the compose file, which will mount your workspace so scripts update dynamically, keep stdin open, and allocate a tty so `nano` works):
 
 ```bash
-docker compose run --rm cli [OPTIONS]
+docker compose -f docker/docker-compose.yml run --rm cli [OPTIONS]
 ```
 
 #### Examples:
-* **Format only:** `docker compose run --rm cli --mode format`
-* **Upload for Sunday:** `docker compose run --rm cli --mode upload`
-* **Upload for a manual date:** `docker compose run --rm cli --mode upload --date 2026-01-01`
+* **Format only:** `docker compose -f docker/docker-compose.yml run --rm cli --mode format`
+* **Upload for Sunday:** `docker compose -f docker/docker-compose.yml run --rm cli --mode upload`
+* **Upload for a manual date:** `docker compose -f docker/docker-compose.yml run --rm cli --mode upload --date 2026-01-01`
 
 ### CLI Options
 
