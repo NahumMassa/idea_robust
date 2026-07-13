@@ -38,18 +38,18 @@ services:
       - ../.env
     environment:
       - DB_HOST=db
-    #TO AUTOMATIC RESTART WHEN SAVING CHANGES
-    #COMMENT THIS IN PRODUCTION
+    # Live-reload on file save (disable in production)
     volumes:
       - ..:/app
 
-  cli:
+  uploader:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.cli
-    container_name: idea_robust_cli
-    stdin_open: true
-    tty: true
+      dockerfile: docker/Dockerfile.uploader
+    container_name: idea_robust_uploader
+    restart: unless-stopped
+    ports:
+      - "8502:8502"
     depends_on:
       db:
         condition: service_healthy
@@ -57,9 +57,9 @@ services:
       - ../.env
     environment:
       - DB_HOST=db
+    # Live-reload on file save (disable in production)
     volumes:
       - ..:/app
-    entrypoint: [ "python", "cli_program/setlistcli.py" ]
 
 volumes:
   postgres_data:

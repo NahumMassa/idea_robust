@@ -1,7 +1,7 @@
 
 import re
 from datetime import datetime, timedelta
-
+from models import Songs, Artist, Genre, Performance, session
 
 
 def print_table(songs, artists, links):
@@ -39,6 +39,17 @@ def get_data_from_text(text):
 
   return (songs, artists, links)
 
+def create_objects_from_text(setlist):
+  #create the objects for the songs
+  songs = []
+  artists = []
+  links = []
+  
+  for song, artist, link in zip(setlist[0], setlist[1], setlist[2]):
+    artist = Artist(name=artist)
+    song = Songs(title=song, artist_id=artist.id, genre_id=1, tempo=20, tone="C", link_yt=link)
+    session.add(song)
+    session.commit()
 
 
 def get_timestamp_for_Sunday()->str:
@@ -60,20 +71,7 @@ def get_timestamp_for_Sunday()->str:
 
 
         
-def create_tuples_for_performance(setlist: tuple[list[str], list[str]], sunday_date)->list:
-    """
-    This function creates the table with the songs and the date when they were played.
-    we only need the titles and the date
-    """
-    title,artist = setlist
-    if title is None or artist is None: 
-        raise ValueError("Make sure the input text has a valid format")
 
-    #if no date is provided, get the timestamp for Sunday
-    if sunday_date is None:
-      sunday_date = str(get_timestamp_for_Sunday())
-      
-    return [(title, artist, sunday_date) for title, artist in zip(title, artist)] 
 
 
 

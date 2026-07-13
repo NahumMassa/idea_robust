@@ -1,113 +1,108 @@
+"""
+Uploads setlist data to the DB using SQLAlchemy models.
+Called by setlistcli.py with --mode upload.
+"""
+
+import sys
 import os
-from contextlib import contextmanager
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
-from format_setlist import get_data_from_text, create_tuples_for_performance
-import psycopg2 as pg
-from psycopg2 import extras 
-from dotenv import load_dotenv
+# Add project root so `models` package is importable
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
-
-#python cli_program/cli_program.py --mode upload
-#python cli_program/cli_program.py --mode upload --date 2026-01-01
+from format_setlist import get_data_from_text, get_timestamp_for_Sunday
+from models.models import session, Artist, Songs, Performance
 
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-@contextmanager
-def get_db_cursor():
+def _get_or_create_artist(sess, name: str):
     """
-    gets a cursor to the db with a context manager that yields
+    Returns the Artist row (existing or newly created).
     """
-    #CONNECTING TO DB 
-    print("Connectin to the DB...")
-    conn = pg.connect(f"""
-        dbname={os.getenv("DB_NAME")}
-        user={os.getenv("DB_USER")}
-        password={os.getenv("DB_PASSWORD")}
-        host={os.getenv("DB_HOST")}
-        port={os.getenv("DB_PORT")}"""
+    instance = sess.query(Artist).filter_by(name=name.strip().title()).first()
+    if instance:
+        return instance
+    instance = Artist(name=name)
+    sess.add(instance)
+    sess.flush()  # write to DB to get the generated id, without committing yet
+    return instance
+
+
+def _get_or_create_song(sess, title: str, artist_id: int, link_yt: str):
+    """
+    Returns the Songs row (existing or newly created).
+    Matched by title + link_yt. tempo/tone/genre_id are optional at upload time.
+    """
+    instance = sess.query(Songs).filter(
+        Songs.title == title.strip().title(),
+        Songs.link_yt == link_yt.strip()
+    ).first()
+    if instance:
+        return instance
+    instance = Songs(
+        title=title,
+        artist_id=artist_id,
+        link_yt=link_yt,
+        genre_id=None,
+        tempo=None,
+        tone=None,
     )
-    
-    #CREATING CURSOR AND YIELDING
-    with conn, conn.cursor() as cur:
-        print("Connection and cursor are ready.")
-        yield cur 
-        #Psycopg manages the conn.commit if the cursor is succesful 
+    sess.add(instance)
+    sess.flush()
+    return instance
 
-    conn.close()
-    print("Connection closed.")
 
-def _single_upload(query:str, data:list, temp:str=None):
+def upload_data_to_db(data: tuple[list[str], list[str], list[str]], date: str):
     """
-    this functions upload the data to the db 
+    Upload all setlist data to the DB (artist → songs → performance order).
+    Rolls back the entire transaction on any error.
     """
-    print("Uploading data...")
+    titles, artists_list, links = data
+
+    if date is None:
+        date = get_timestamp_for_Sunday()
+
+    played_at = datetime.strptime(date, "%Y-%m-%d")
+
     try:
-        with get_db_cursor() as cur:
-            extras.execute_values(cur, query, data, template=temp)
-            print("uploaded successfully")
+        # ── 1. ARTISTS ────────────────────────────────────────────────────────
+        print("ARTIST UPLOAD --------------------->")
+        artist_objects = {}
+        for name in artists_list:
+            a = _get_or_create_artist(session, name)
+            artist_objects[name.strip().title()] = a
+            print(f"  {'created' if not a.id else 'found'}: {a.name} (id={a.id})")
+
+        # ── 2. SONGS ──────────────────────────────────────────────────────────
+        print("SONGS UPLOAD --------------------->")
+        song_objects = {}
+        for title, artist_name, link in zip(titles, artists_list, links):
+            a = artist_objects[artist_name.strip().title()]
+            s = _get_or_create_song(session, title, a.id, link)
+            song_objects[title.strip().title()] = s
+            print(f"  {'created' if not s.id else 'found'}: {s.title} (id={s.id})")
+
+        # ── 3. PERFORMANCE ────────────────────────────────────────────────────
+        print("PERFORMANCE UPLOAD --------------------->")
+        for title in titles:
+            s = song_objects[title.strip().title()]
+            existing = session.query(Performance).filter_by(
+                song_id=s.id, played_at=played_at
+            ).first()
+            if existing:
+                print(f"  skipped (already exists): {s.title} on {date}")
+                continue
+            perf = Performance(song_id=s.id, played_at=played_at)
+            session.add(perf)
+            print(f"  added: {s.title} on {date}")
+
+        session.commit()
+        print("ALL DATA UPLOADED SUCCESSFULLY!!")
+
     except Exception as e:
-        print(f"Error: {e}")
-
-def upload_data_to_db(data:tuple[list[str], list[str], list[str]], date:str): 
-    """
-    upload all the data to the db, we have 3 tables:
-    -artist
-    -songs
-    -performance
-    """
-    titles, artists, links = data
-    artist_tuple = [(artist,) for artist in artists]
-    songs_tuple = [(title, artist, link) for title, artist, link in zip(titles, artists, links)]
-    performance_tuple = create_tuples_for_performance((titles, artists), date)
-
-    
-    query_artist = """
-        INSERT INTO artist (name) VALUES %s
-        ON CONFLICT (name) DO NOTHING;
-    """
-    
-    query_songs = """
-        INSERT INTO songs (title, artist_id, link_yt) 
-        VALUES %s
-        ON CONFLICT (title, link_yt) DO NOTHING;
-    """
-
-    query_performance = """
-        INSERT INTO performance (song_id, artist_id, played_at)
-        VALUES %s
-        ON CONFLICT (played_at, song_id) DO NOTHING;
-    """
-
-    template_songs = """
-        (%s, 
-        (SELECT id FROM artist WHERE name = %s),
-        %s)
-    """
-
-    template_performance = """
-        ((SELECT id FROM songs WHERE title = %s),
-        (SELECT id FROM artist WHERE name = %s),
-        %s)
-    """
-
-    #ARTIST UPLOAD
-    print("ARTIST UPLOAD --------------------->")
-    _single_upload(query_artist, artist_tuple)
-
-    #SONGS UPLOAD
-    print("SONGS UPLOAD --------------------->")
-    _single_upload(query_songs, songs_tuple, temp=template_songs)
-    
-    #PERFOMANCE UPLOAD
-    print("PERFOMANCE UPLOAD --------------------->")
-    _single_upload(query_performance, performance_tuple, temp=template_performance)
-    print("ALL DATA UPLOADED SUCCESSFULLY!!")
-
-
-
+        session.rollback()
+        print(f"Error during upload, rolled back: {e}")
+        raise
 
 
 if __name__ == "__main__":

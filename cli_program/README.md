@@ -1,24 +1,24 @@
-# CLI Setlist Manager
+# Setlist Uploader
 
+A local web app for formatting and uploading worship setlists to the PostgreSQL database for the **IDEA Mérida Ministerio de Alabanza** system.
 
-
-
-A command-line tool designed to format setlists and upload them directly to the PostgreSQL database for the **IDEA Mérida Ministerio de Alabanza** system.
-
-This program provides an interactive, terminal-based editor (`nano`) to safely input, preview, and persist performance data, ensuring database normalization constraints and unique key indices are respected.
+This replaces the old terminal-based CLI. The uploader runs as a **Streamlit page on localhost** — paste your setlist, see a live preview, pick the date, and upload with one click.
 
 ---
 
 ## Features
-- **Format Mode**: Preview formatted lists of songs, artists, and links in a clean terminal table before saving.
-- **Upload Mode**: Automatically batch-inserts artists, songs, and performance details.
-- **Database Safety**: Resolves foreign keys using optimized subqueries and handles unique constraints safely (i.e. `ON CONFLICT DO NOTHING`).
-- **Flexible Dates**: Defaults to the next upcoming Sunday date automatically, with support for custom manual dates.
+
+- **Live Preview**: Instantly see songs, artists, and links in a formatted table as you type.
+- **Date Picker**: Defaults to the next upcoming Sunday automatically; override with any date.
+- **Validation**: Upload button is locked until songs / artists / links counts match.
+- **Database Safety**: Uses SQLAlchemy models — `get_or_create` for artists, deduplication for songs and performances.
+- **One-click Upload**: Artists → Songs → Performances inserted in the correct dependency order, with full rollback on error.
 
 ---
 
 ## Setup & Prerequisites
-Make sure you have your environment variables set up in your `.env` file at the root of the repository:
+
+Make sure your `.env` file at the project root has the DB credentials:
 
 ```env
 DB_NAME=your_database_name
@@ -28,105 +28,81 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
-Ensure your python virtual environment is active and psycopg2 dependencies are installed.
+---
+
+## Running
+
+### With Docker (recommended)
+
+The `uploader` service is defined in `docker/docker-compose.yml` and runs on port **8502**.
+
+```bash
+# Start only the uploader (and its DB dependency)
+docker compose -f docker/docker-compose.yml up uploader
+
+# Or start everything
+docker compose -f docker/docker-compose.yml up
+```
+
+Then open **http://localhost:8502** in your browser.
+
+### Locally (without Docker)
+
+```bash
+# From the project root
+venv/bin/streamlit run cli_program/upload_app.py
+```
+
+Then open **http://localhost:8501** in your browser.
 
 ---
 
-## Usage
+## Setlist Format
 
-Run the program from the repository root:
-```bash
-docker compose -f docker/docker-compose.yml run --rm cli --mode upload
+Paste your setlist into the text area using this format — three sections separated by `---`:
 
-python cli_program/setlistcli.py [OPTIONS]
+```
+Song title 1
+Song title 2
+Song title 3
+---
+Artist 1
+Artist 2
+Artist 3
+---
+https://youtu.be/...
+https://youtu.be/...
+https://youtu.be/...
 ```
 
-### Running with Docker
+> **Important:** Each section must have the **same number of lines** — one song, one artist, and one link per row, in the same order.
 
-Since the program is integrated into your `docker/docker-compose.yml`, you can run it inside a Docker container without setting up a local Python environment.
+### Supported link formats
 
-Run the service using `docker compose run` (pointing to the compose file, which will mount your workspace so scripts update dynamically, keep stdin open, and allocate a tty so `nano` works):
-
-```bash
-docker compose -f docker/docker-compose.yml run --rm cli [OPTIONS]
-```
-
-#### Examples:
-* **Format only:** `docker compose -f docker/docker-compose.yml run --rm cli --mode format`
-* **Upload for Sunday:** `docker compose -f docker/docker-compose.yml run --rm cli --mode upload`
-* **Upload for a manual date:** `docker compose -f docker/docker-compose.yml run --rm cli --mode upload --date 2026-01-01`
-
-### CLI Options
-
-| Argument | Choices / Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--mode` | `format`, `upload` | `format` | Operation mode. `format` displays a preview; `upload` persists data to the database. |
-| `--date` | `YYYY-MM-DD` | `None` | Optional manual date. If omitted, defaults to the upcoming Sunday. |
-| `-h, --help` | | | Show the help message and exit. |
+| Format | Example |
+|---|---|
+| Short YouTube | `https://youtu.be/abc123` |
+| Full YouTube | `https://www.youtube.com/watch?v=abc123` |
 
 ---
 
-## Detailed Guide
+## File Structure
 
-### Step 1: Executing the Command
-To parse and upload a setlist for the upcoming Sunday, run:
-```bash
-python cli_program/setlistcli.py --mode upload
 ```
-
-### Step 2: Filling out the Template
-The CLI will automatically launch a temporary instance of the `nano` editor in your terminal displaying a blueprint:
-
-```text
-#title
-----
-#artist
-----
-#link
-----
+cli_program/
+├── upload_app.py       # Streamlit upload UI (entry point)
+├── upload.py           # DB logic: get_or_create, rollback, session management
+├── format_setlist.py   # Pure text parser (no DB imports)
+└── README.md
 ```
-
-Write down the songs, artists, and YouTube links underneath each header in the **exact same order** (separated by lines).
-
-#### Example:
-```text
-Por el poder de tu amor
-Cantos de Júbilo
-----
-Ingrid Rosario
-Jaime Murrel
-----
-https://youtu.be/Tssk5UWxvuw
-https://youtu.be/wchrgDmxzXw
-```
-
-* **Save & Exit**: Press `Ctrl + O`, then press `Enter` to confirm, and finally press `Ctrl + X` to exit.
 
 ---
 
-## Example Usage Commands
+## Architecture
 
-### 1. Previewing a Setlist (Format Only)
-Validates and prints the formatted setlist in a table without uploading to the database.
-```bash
-python cli_program/setlistcli.py --mode format
-```
-**Output Example:**
-```text
-*CANCIÓN* | *ARTISTA* | *LINK*
---------------------
-> Por el poder de tu amor | Ingrid Rosario | https://youtu.be/Tssk5UWxvuw
-> Cantos de Júbilo | Jaime Murrel | https://youtu.be/wchrgDmxzXw
-```
-
-### 2. Uploading for Next Sunday (Default)
-Loads the setlist and calculates the upcoming Sunday automatically for the `played_at` date.
-```bash
-python cli_program/setlistcli.py --mode upload
-```
-
-### 3. Uploading with a Manual Date
-Overrides the default Sunday calculation and logs the performance on a specific date (e.g. `2026-01-01`).
-```bash
-python cli_program/setlistcli.py --mode upload --date 2026-01-01
-```
+| File | Responsibility |
+|---|---|
+| `upload_app.py` | UI only — collects input, renders preview, triggers upload |
+| `upload.py` | DB only — artists → songs → performances, handles duplicates and rollback |
+| `format_setlist.py` | Text parsing only — no DB imports, no side effects |
+| `models/` | SQLAlchemy models with `@validates` sanitization and `exists()` helpers |
