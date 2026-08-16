@@ -1,4 +1,4 @@
-from .models import Songs, Artist, Genre, Performance, session
+from .models import Songs, Artist, Genre, Performance, session, TONALIDADES
 
 __all__ = [
     'Songs',
@@ -6,4 +6,5 @@ __all__ = [
     'Genre',
     'Performance',
     'session',
+    'TONALIDADES'
 ]

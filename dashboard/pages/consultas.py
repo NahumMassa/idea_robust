@@ -2,33 +2,10 @@ import streamlit as st
 from datetime import timedelta
 from datetime import datetime
 
-
-
-st.set_page_config(page_title="Consultas", page_icon="🔎")
-
-st.title("Consulta de canciones")
-st.write("Busca por artista o canción para ver información específica")
-
 conn = st.connection("postgres", type="sql")
 
-st.header("Busqueda por nombre")
-song_title= st.text_input("ingresa el nombre de la canción").title()
-
-#----------------
-# BUSQUEDA POR TÍTULO
-#------------------
-
-
-if song_title:
-
-    query_song_by_title = conn.query(
-        "SELECT * FROM songs WHERE title LIKE :title",
-        params={"title": f"%{song_title}%"},
-    )
-    if not query_song_by_title.empty:
-        st.dataframe(query_song_by_title, hide_index=True)
-    else:
-        st.warning("No se encontró ninguna canción con ese título.")
+st.set_page_config(page_title="Consultas", page_icon="🔎")
+st.title("Consulta de canciones")
 
 #----------------
 # BUSQUEDA POR ARTISTA
@@ -37,8 +14,8 @@ if song_title:
 #1. Fetch all the artists
 artistas = conn.query("select name from artist")
 
-st.header("Buscador de Repertorio")
-st.write("Selecciona una banda para ver sus detalles:")
+st.header("Buscar por artista")
+st.write("Selecciona un nombre para ver sus detalles:")
 
 #2. user selects the artist
 artist_name = st.selectbox(
@@ -56,7 +33,7 @@ artist_songs = conn.query(
     """,
     params={"artist_name": artist_name},
 )
-
+#KPI 1: Total de canciones del artista
 total_songs_artist = conn.query(
     """
     SELECT COUNT(*) AS total_songs
@@ -67,6 +44,7 @@ total_songs_artist = conn.query(
     params={"artist_name": artist_name},
 ).iloc[0]
 
+#KPI 2: Total de tonos del artista
 total_tones_artist = conn.query(
     """
     SELECT COUNT(DISTINCT s.tone) AS total_tones
@@ -86,9 +64,76 @@ with col2:
     st.metric("Tonos", int(total_tones_artist["total_tones"]))
 
 if not artist_songs.empty:
-    st.dataframe(artist_songs, hide_index=True)
-else:
-    st.warning(f"No se encontraron canciones de {artist_name}.")
+    with st.expander("canciones del artista"):
+        st.dataframe(artist_songs, hide_index=True)
+
+
+#--------------------------------
+#BUSQUEDA POR ATRIBUTOS
+#--------------------------------
+
+#--------- POR GENERO ---------
+generos = ["Alabanza", "Adoración"]
+st.header("Buscador de atributos")
+
+with st.expander("buscar por género"):
+    genero = st.selectbox("Buscar por género:", options=generos)
+    if genero:
+        query_songs_by_genre = conn.query(
+        """select s.title as "Canción", 
+            a.name as "Artista",
+            s.tempo,
+            s.tone,
+            s.link_yt as link
+        from songs s
+        left join artist a on a.id = s.artist_id
+        where genre_id  = (select id from genre where name = :genero);""",
+        params={"genero": genero},
+        )
+        if not query_songs_by_genre.empty:
+            st.dataframe(query_songs_by_genre, hide_index=True)
+        else:
+            st.warning("No se encontraron canciones con ese género.")
+
+
+#---------------- BUSQUEDA POR TÍTULO
+
+with st.expander("buscar por título"):
+    song_title= st.text_input("ingresa el nombre de la canción").title()
+
+
+    if song_title:
+
+        query_song_by_title = conn.query(
+            "SELECT * FROM songs WHERE title LIKE :title",
+            params={"title": f"%{song_title}%"},
+        )
+        if not query_song_by_title.empty:
+            st.dataframe(query_song_by_title, hide_index=True)
+        else:
+            st.warning("No se encontró ninguna canción con ese título.")
+
+#------------------ Por Tempo ---------
+with st.expander("buscar por tempo"):
+    rango_tempo = st.slider("Selecciona el rango de tempo:", min_value=0, max_value=200, value=(0, 200), step=1)
+    tempo_min, tempo_max = rango_tempo
+    query_songs_by_tempo = conn.query(
+        """select s.title, 
+        a.name,
+        s.tempo,
+        s.tone,
+        s.link_yt 
+        from songs s
+        left join artist a on a.id = s.artist_id
+        where tempo between :tempo_min and :tempo_max;
+        """,
+        params={"tempo_min": tempo_min, "tempo_max": tempo_max},
+    )
+    if not query_songs_by_tempo.empty:
+        st.dataframe(query_songs_by_tempo, hide_index=True)
+    else:
+        st.warning("No se encontraron canciones con ese rango de tempo.")
+
 
 #-------------------------
 #BUSCAR CANCIONES NO TOCADAS HACE MÁS DE 3 MESES

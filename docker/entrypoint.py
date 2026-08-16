@@ -7,6 +7,7 @@ db_password = os.environ.get("DB_PASSWORD") or "idea_robust_password_123"
 db_host = os.environ.get("DB_HOST") or "db"
 db_port = os.environ.get("DB_PORT") or "5432"
 db_name = os.environ.get("DB_NAME") or "postgres"
+admin_token = os.environ.get("ADMIN_TOKEN") or "test_token123"
 
 # Generate the connection URL
 url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
@@ -17,7 +18,10 @@ secrets_dir.mkdir(parents=True, exist_ok=True)
 secrets_file = secrets_dir / "secrets.toml"
 
 # Write the secrets.toml configuration file
-content = f"""[postgres]
+# ADMIN_TOKEN must be before any [section] headers or TOML nests it under the last section.
+content = f"""ADMIN_TOKEN = "{admin_token}"
+
+[postgres]
 DB_NAME = "{db_name}"
 DB_USER = "{db_user}"
 DB_PASSWORD = "{db_password}"

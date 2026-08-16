@@ -1,7 +1,7 @@
 
 
 from datetime import datetime
-
+import re 
 
 from sqlalchemy import Column, Integer, String, DateTime, Float
 from sqlalchemy.orm import sessionmaker, declarative_base, validates
@@ -28,6 +28,13 @@ engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db_name}'
 Base = declarative_base()
 Session = sessionmaker(engine)
 session = Session()
+
+TONALIDADES = [
+    # Mayores
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    # Menores (con formato '-')
+    "C-", "C#-", "D-", "D#-", "E-", "F-", "F#-", "G-", "G#-", "A-", "A#-", "B-"
+]
 
 
 class Songs(Base):
@@ -63,18 +70,37 @@ class Songs(Base):
         if value is None:
             return None  # optional at upload time
         value = value.strip().upper()
-        if value not in ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]:
+        if value not in TONALIDADES:
             raise ValueError("Tone is not valid")
         return value
 
     @validates("link_yt")
-    def sanitize_link_yt(self,key,value):
+    def sanitize_link_yt(self, key, value):
         if value is None:
             raise ValueError("Link yt cannot be None")
         value = value.strip()
-        if not value.startswith("https://youtu.be/") and not value.startswith("https://www.youtube.com/watch?v="):
+        yt_pattern = re.compile(
+            r'(?:https?:\/\/)?'                           # Protocolo opcional
+            r'(?:www\.|m\.)?'                             # Subdominios opcionales (www, m)
+            r'(?:'
+                r'youtu\.be\/'                            # Formato corto: youtu.be/<id>
+                r'|youtube\.com\/(?:'
+                    r'watch\?(?:.*&)?v='                  # Formato estándar: youtube.com/watch?v=<id>
+                    r'|embed\/'                           # Formato embed: youtube.com/embed/<id>
+                    r'|v\/'                               # Formato legacy: youtube.com/v/<id>
+                    r'|shorts\/'                          # Formato Shorts: youtube.com/shorts/<id>
+                    r'|live\/'                            # Formato Live: youtube.com/live/<id>
+                r')'
+            r')'
+            r'([a-zA-Z0-9_-]{11})'                        # Grupo de captura: ID de 11 caracteres
+            r'(?:[^\s]*)?',                               # Parámetros adicionales en la query string (&t=..., etc.)
+            re.IGNORECASE
+        )
+
+        match = yt_pattern.search(value)
+        if not match:
             raise ValueError("Link yt is not valid")
-        return value
+        return match.group(0)
     __str__ = lambda self: f'title {self.title}, artist_id {self.artist_id}, genre_id {self.genre_id}, tempo {self.tempo}, tone {self.tone}, link_yt {self.link_yt}'
 
 class Artist(Base):
@@ -124,12 +150,12 @@ if __name__ == '__main__':
     print('TEST, QUERY SONGS-------------------')
     print(session.query(Songs).first())
     song = Songs(
-        title="Dummy song for test",
+        title="Dummy song for test345",
         artist_id=1,
         genre_id=1,
         tempo=125,
-        tone="C",
-        link_yt="https://youtu.be/ZS7st5oNSWU?si=cBTdmBE8dsB-LBaGS",
+        tone="C-",
+        link_yt="https://youtu.be/xXh0JZvjQSY?si=uH7vfKTJw2KjBaDW"
     )
     print(session.add(song))
     session.commit()
