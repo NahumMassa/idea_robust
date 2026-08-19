@@ -7,7 +7,7 @@ project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from models import Artist, Genre, Songs, session, TONALIDADES
+from models import Artist, Genre, Songs, Performance, PerformanceElement, session, TONALIDADES, get_next_sunday_date
 
 conn = st.connection("postgres", type="sql")
 
@@ -18,7 +18,7 @@ ADMIN_SECRET = st.secrets["ADMIN_TOKEN"]
 admin = st.query_params.get("admin")
 
 if admin != ADMIN_SECRET:
-    st.error("❌ Acceso denegado")
+    st.error("❌ Acceso denegado: Acceso solo para Administradores")
     st.stop()
 
 st.header("Panel de administrador")
@@ -113,33 +113,78 @@ with st.expander("creat setlist"):
 
     st.subheader("📋 Seleccionar Setlist del Domingo")
 
-    # 1. Simulación de datos (o tu df obtenido de PostgreSQL)
-    df_canciones = pd.DataFrame({
-        "id": [1, 2, 3, 4, 5, 6, 7],
-        "titulo": ["Gracia Sublime", "Rey de Reyes", "Abre Mis Ojos", "La Bendición", "Way Maker", "Hermoso Dios", "Cuan Grande es Dios"],
-        "artista": ["Phil Wickham", "Hillsong", "Paul Baloche", "Kari Jobe", "Sinach", "Un Corazón", "Chris Tomlin"],
-        "tono": ["G", "D", "E-", "B", "A", "C", "C#"],
-        "tempo": [102, 130, 110, 70, 68, 75, 78]
-    })
+    # 1. Simulación de datos (o tu df_all_songs obtenido de PostgreSQL)
+    df_all_songs = pd.DataFrame(conn.query("""select s.title,
+                                                s.id,
+                                                a.name as artist,
+                                                s.link_yt,
+                                                s.tempo
+                                            from songs s
+                                            left join artist a on artist_id = a.id;""", ttl=0))
+                                            #TTL 0, PARA QUE AL AGREGAR CANCIONES APAREZCAN y no se use el caché
 
-
-
-
-    df = df_canciones.copy() 
     # Creamos una columna auxiliar descriptiva para identificar cada opción
-    df["etiqueta"] = df["titulo"] + " - " + df["artista"] + " (" + df["tono"] + ")"
-
+    df_all_songs["etiqueta"] = df_all_songs["title"] + " - " + df_all_songs["artist"] + " - " + df_all_songs["tempo"].astype(str)
+    #el tempo solo es para que al elegirs, sepa ponerla de más lenta a rápida
     seleccion = st.multiselect(
         label="Busca y elige las 5-6 canciones:",
-        options=df["etiqueta"].tolist(),
+        options=df_all_songs["etiqueta"].tolist(),
         max_selections=6
     )
 
     if seleccion:
-        df_setlist = df[df["etiqueta"].isin(seleccion)]
+        df_setlist = df_all_songs[df_all_songs["etiqueta"].isin(seleccion)]
         
         mensaje = "*🎶 SETLIST DEL SERVICIO 🎶*\n\n"
+        mensaje = f"{'*CANCIÓN*'} | {'*ARTISTA*'} | {'*LINK*'}\n"
         for idx, (_, row) in enumerate(df_setlist.iterrows(), 1):
-            mensaje += f"{idx}. *{row['titulo']}* - {row['artista']} ({row['tono']}) - {row['tempo']} BPM\n"
+            mensaje += f"> *{row['title']}* | {row['artist']} | {row['link_yt']} \n"
         
         st.text_area("Copiar para WhatsApp:", value=mensaje, height=160)
+
+### FALTA LÓGICA PARA SUBIR A LA TABLA PERFORMANCE CON FECHA DE HOY U OTR
+with st.expander("subir performance"):
+    check = st.checkbox("Fecha personalizada?")
+    date_str = get_next_sunday_date()
+    
+    if check:
+        st.write(f" fecha natural: {date_str}")
+        date_str = st.text_input("ponga la fecha con formato YYYY-MM-DD")
+        try:
+            get_next_sunday_date(date_str)  
+            st.write("Fecha válida")
+        except ValueError as e:
+            st.error(f"Error: {e}")
+
+
+    #NOTAS 
+    notes_for_performance = st.text_input("Notas para el performance")
+
+    if st.button("Upload"):
+        try:
+            performance = Performance(played_at=date_str,
+                service_type="Domingo",
+                notes=notes_for_performance
+                )
+            
+            session.add(performance)
+            #tengo que hacer un flush porque al hacer append directamente a la lista de elementos, 
+            # no se le asigna un id hasta que se hace flush o commit
+            session.flush()
+            #st.write(performance.id)
+            for i, (_, row) in enumerate(df_setlist.iterrows(), 1):
+                performance_element = PerformanceElement(
+                    performance_id=performance.id,
+                    song_id=row["id"],
+                    song_order=i
+                )
+
+                session.add(performance_element)
+            session.add(performance)
+            session.commit()
+                
+            st.success("Performance subida exitosamente")
+        except Exception as e:
+            session.rollback()
+            st.error(f"Error al subir performance: {e}")
+        

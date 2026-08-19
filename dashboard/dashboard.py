@@ -19,8 +19,7 @@ kpis = conn.query("""
     SELECT
         (SELECT COUNT(*) FROM songs) AS total_songs,
         (SELECT COUNT(*) FROM artist) AS total_artists,
-        (SELECT COUNT(distinct(tone)) from songs) as total_tones,
-        (SELECT COUNT(*) FROM performance) AS total_performances
+        (SELECT COUNT(distinct(tone)) from songs) as total_tones
 """).iloc[0]
 
 

@@ -1,11 +1,25 @@
 import streamlit as st
 from datetime import timedelta
 from datetime import datetime
+import sys
+from pathlib import Path
+import pandas as pd
 
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from models.utils import show_normalized_df
+
+
+#CONNECTION
 conn = st.connection("postgres", type="sql")
 
 st.set_page_config(page_title="Consultas", page_icon="🔎")
 st.title("Consulta de canciones")
+
+
+
 
 #----------------
 # BUSQUEDA POR ARTISTA
@@ -65,7 +79,7 @@ with col2:
 
 if not artist_songs.empty:
     with st.expander("canciones del artista"):
-        st.dataframe(artist_songs, hide_index=True)
+        show_normalized_df(artist_songs, hide_index=True)
 
 
 #--------------------------------
@@ -84,14 +98,15 @@ with st.expander("buscar por género"):
             a.name as "Artista",
             s.tempo,
             s.tone,
-            s.link_yt as link
+            s.link_yt 
         from songs s
         left join artist a on a.id = s.artist_id
         where genre_id  = (select id from genre where name = :genero);""",
         params={"genero": genero},
         )
         if not query_songs_by_genre.empty:
-            st.dataframe(query_songs_by_genre, hide_index=True)
+            show_normalized_df(pd.DataFrame(query_songs_by_genre))
+            
         else:
             st.warning("No se encontraron canciones con ese género.")
 
@@ -109,7 +124,7 @@ with st.expander("buscar por título"):
             params={"title": f"%{song_title}%"},
         )
         if not query_song_by_title.empty:
-            st.dataframe(query_song_by_title, hide_index=True)
+            show_normalized_df(pd.DataFrame(query_song_by_title))
         else:
             st.warning("No se encontró ninguna canción con ese título.")
 
@@ -130,7 +145,7 @@ with st.expander("buscar por tempo"):
         params={"tempo_min": tempo_min, "tempo_max": tempo_max},
     )
     if not query_songs_by_tempo.empty:
-        st.dataframe(query_songs_by_tempo, hide_index=True)
+        show_normalized_df(pd.DataFrame(query_songs_by_tempo))
     else:
         st.warning("No se encontraron canciones con ese rango de tempo.")
 
@@ -189,7 +204,7 @@ if time_span:
     time_span = int(time_span)
     if time_span > 0:
         songs_not_played = not_played_songs_due_a_date(time_span)
-        st.dataframe(songs_not_played, hide_index=True)
+        show_normalized_df(pd.DataFrame(songs_not_played))
 
 #-----------------
 #SUGERENCIA DE CANCIONES

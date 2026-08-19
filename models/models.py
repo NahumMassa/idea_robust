@@ -3,8 +3,8 @@
 from datetime import datetime
 import re 
 
-from sqlalchemy import Column, Integer, String, DateTime, Float
-from sqlalchemy.orm import sessionmaker, declarative_base, validates
+from sqlalchemy import Column, Integer, String, Date, Float, Text, ForeignKey
+from sqlalchemy.orm import sessionmaker, declarative_base, validates, relationship
 from sqlalchemy import create_engine
 
 from os import getenv
@@ -138,13 +138,47 @@ class Genre(Base):
     __str__ = lambda self: f'name {self.name}, id {self.id}'
 
 class Performance(Base):
-    __tablename__ = "performance"
-    id = Column(Integer, primary_key=True)
-    song_id = Column(Integer)
-    played_at = Column(DateTime)
+    __tablename__ = "performances"
 
-    __str__ = lambda self: f'song_id {self.song_id}, played_at {self.played_at}'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    played_at = Column(Date, default=datetime.utcnow, nullable=False)
+    service_type = Column(String(50), default="Domingo")
+    notes = Column(Text, nullable=True)
 
+    # Relación uno a muchos con cascade para borrar elementos si se borra el performance
+    elements = relationship(
+        "PerformanceElement", 
+        back_populates="performance", 
+        cascade="all, delete-orphan",
+        order_by="PerformanceElement.song_order"
+    )
+
+    @validates("played_at")
+    def sanitize_played_at(self, key, value):
+        if value is None:
+            raise ValueError("Played at cannot be None")
+        return value
+
+class PerformanceElement(Base):
+    __tablename__ = "performance_elements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    performance_id = Column(Integer, ForeignKey("performances.id", ondelete="CASCADE"), nullable=False)
+    song_id = Column(Integer, ForeignKey("songs.id"), nullable=False)
+    song_order = Column(Integer, nullable=False)
+    specific_key = Column(String(10), nullable=True)
+
+    # Relaciones para navegar entre objetosz
+    performance = relationship("Performance", back_populates="elements")
+    song = relationship("Songs")
+
+    @validates("song_order")
+    def sanitize_song_order(self, key, value):
+        if value is None:
+            raise ValueError("Song order cannot be None")
+        if value < 0:
+            raise ValueError("Song order cannot be negative")
+        return value
 
 if __name__ == '__main__':
     print('TEST, QUERY SONGS-------------------')
