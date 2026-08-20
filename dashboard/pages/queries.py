@@ -14,11 +14,28 @@ conn = st.connection("postgres", type="sql")
 # token from streamlit secrets
 ADMIN_SECRET = st.secrets["ADMIN_TOKEN"]
 
-# token from parameters
-admin = st.query_params.get("admin")
 
-if admin != ADMIN_SECRET:
+def _admin_token_from_url() -> str | None:
+    """Read admin token from URL query params (handles list/str variants)."""
+    admin = st.query_params.get("admin")
+    if isinstance(admin, list):
+        admin = admin[0] if admin else None
+    if admin is None:
+        values = st.query_params.get_all("admin")
+        admin = values[0] if values else None
+    return admin.strip() if admin else None
+
+
+url_token = _admin_token_from_url()
+if url_token == ADMIN_SECRET:
+    st.session_state["admin_authenticated"] = True
+
+if not st.session_state.get("admin_authenticated"):
     st.error("❌ Acceso denegado: Acceso solo para Administradores")
+    st.caption(
+        "Usa el `ADMIN_TOKEN` del servidor (archivo `.env` en producción), "
+        "no el de tu máquina local. Ejemplo: `?admin=TU_TOKEN`"
+    )
     st.stop()
 
 st.header("Panel de administrador")
