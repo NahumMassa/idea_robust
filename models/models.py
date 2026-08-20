@@ -31,9 +31,9 @@ session = Session()
 
 TONALIDADES = [
     # Mayores
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
     # Menores (con formato '-')
-    "C-", "C#-", "D-", "D#-", "E-", "F-", "F#-", "G-", "G#-", "A-", "A#-", "B-"
+    "C-", "Db-", "D-", "Eb-", "E-", "F-", "Gb-", "G-", "Ab-", "A-", "Bb-", "B-"
 ]
 
 
