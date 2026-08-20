@@ -69,7 +69,7 @@ class Songs(Base):
     def sanitize_tone(self,key,value):
         if value is None:
             return None  # optional at upload time
-        value = value.strip().upper()
+        value = value.strip() 
         if value not in TONALIDADES:
             raise ValueError("Tone is not valid")
         return value
