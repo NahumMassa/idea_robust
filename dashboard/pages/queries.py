@@ -33,8 +33,7 @@ if url_token == ADMIN_SECRET:
 if not st.session_state.get("admin_authenticated"):
     st.error("❌ Acceso denegado: Acceso solo para Administradores")
     st.caption(
-        "Usa el `ADMIN_TOKEN` del servidor (archivo `.env` en producción), "
-        "no el de tu máquina local. Ejemplo: `?admin=TU_TOKEN`"
+        "Token no es el mismo"
     )
     st.stop()
 
