@@ -186,12 +186,13 @@ def not_played_songs_due_a_date(time_span_in_weeks: int):
     SELECT 
         s.title AS "Canción",
         a.name AS "Artista",
-        MAX(p.played_at) AS "Última Vez Tocada"
-    FROM performance p
-    INNER JOIN songs s ON s.id = p.song_id
-    INNER JOIN artist a ON a.id = p.artist_id
+        MAX(per.played_at) AS "Última Vez Tocada"
+    FROM performances per
+    INNER JOIN performance_elements pe ON pe.performance_id = per.id
+    INNER JOIN songs s ON s.id = pe.song_id
+    INNER JOIN artist a ON a.id = s.artist_id
     GROUP BY s.title, a.name
-    HAVING MAX(p.played_at) < :time_span;
+    HAVING MAX(per.played_at) < :time_span;
 
     """, params={"time_span": time_span})
     

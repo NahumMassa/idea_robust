@@ -27,31 +27,31 @@ sunday_date = get_next_sunday_date()
 st.header("Setlist del Domingo")
 
 
-query = (
-    select(
-        Songs.title,
-        Artist.name.label("artist"),
-        Songs.tempo,
-        Songs.tone,
-        Songs.link_yt,
+@st.cache_data(ttl="5d")
+def get_sunday_setlist(sunday_date: str):
+    """
+    Retorna el setlist dado una fecha de domingo.
+    """
+    query = (
+        select(
+            Songs.title,
+            Artist.name.label("artist"),
+            Songs.tempo,
+            Songs.tone,
+            Songs.link_yt,
+        )
+        .select_from(PerformanceElement)
+        .join(Performance, PerformanceElement.performance_id == Performance.id)
+        .outerjoin(Songs, PerformanceElement.song_id == Songs.id)
+        .outerjoin(Artist, Songs.artist_id == Artist.id)
+        .where(Performance.played_at == sunday_date)
     )
-    .select_from(PerformanceElement)
-    .join(Performance, PerformanceElement.performance_id == Performance.id)
-    .outerjoin(Songs, PerformanceElement.song_id == Songs.id)
-    .outerjoin(Artist, Songs.artist_id == Artist.id)
-    .where(Performance.played_at == "2026-08-23")
-)
-@st.cache_data(ttl="5d") #dura 5 días en cache esta query
-def get_sunday_setlist(_query):
-    """
-    Retrona el setlist dada un query. solo hice esta función para poder ponerle cache con st.cache_data
-    """
-    return pd.read_sql(_query, session.bind)
+    return pd.read_sql(query, session.bind)
 
 #renderizar en Streamlit
 st.subheader(f"Canciones para el ({sunday_date})")
 
-df = get_sunday_setlist(query)
+df = get_sunday_setlist(sunday_date)
 show_normalized_df(df)
 conn = st.connection("postgres", type="sql")
 
