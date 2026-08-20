@@ -1,46 +1,68 @@
-import os
+import sys
 import streamlit as st
 from datetime import timedelta
 from datetime import datetime
 from pathlib import Path
+import pandas as pd
+
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from sqlalchemy import select 
+from models import Songs, Artist, Performance, PerformanceElement, get_next_sunday_date, session, show_normalized_df
+
+conn = st.connection("postgres", type="sql")
 
 st.set_page_config(page_title="Setlist Domingo", page_icon="🎼")
 
-conn = st.connection("postgres", type="sql")
+
 #----------------
 # SONGS FOR THIS SUNDAY
 #----------------
 
-def get_upcoming_sunday() -> str:
-    today = datetime.now()
-    remaining_days = 6 - today.weekday()
-    return (today + timedelta(days=remaining_days)).strftime("%Y-%m-%d")
-
-sunday = get_upcoming_sunday()
-
+#get sunday date
+sunday_date = get_next_sunday_date()
 
 st.header("Setlist del Domingo")
 
 
-songs_for_sunday = conn.query("""
-SELECT
-    s.title AS título,
-    a.name AS artista,
-    s.tempo,
-    s.link_yt AS link
-FROM performance p
-INNER JOIN songs s ON s.id = p.song_id
-INNER JOIN artist a ON a.id = p.artist_id
-WHERE p.played_at = :played_at
-""", params={"played_at": sunday})
+query = (
+    select(
+        Songs.title,
+        Artist.name.label("artist"),
+        Songs.tempo,
+        Songs.tone,
+        Songs.link_yt,
+    )
+    .select_from(PerformanceElement)
+    .join(Performance, PerformanceElement.performance_id == Performance.id)
+    .outerjoin(Songs, PerformanceElement.song_id == Songs.id)
+    .outerjoin(Artist, Songs.artist_id == Artist.id)
+    .where(Performance.played_at == "2026-08-23")
+)
+@st.cache_data(ttl="5d") #dura 5 días en cache esta query
+def get_sunday_setlist(_query):
+    """
+    Retrona el setlist dada un query. solo hice esta función para poder ponerle cache con st.cache_data
+    """
+    return pd.read_sql(_query, session.bind)
 
-st.subheader(f"Canciones para el ({sunday})")
-st.dataframe(songs_for_sunday, width="stretch", hide_index=True)
+#renderizar en Streamlit
+st.subheader(f"Canciones para el ({sunday_date})")
 
-
-
+df = get_sunday_setlist(query)
+show_normalized_df(df)
 conn = st.connection("postgres", type="sql")
 
 
+#------------------
+# SUGERENCIAS
+#-----------------
 
+st.header("¿Sugerencias de canciones?")
+st.write("Esta sección está en construcción... Pero aquí podrás poner tus sugerencias de canciones!")
+sugerencia = st.text_input("Sugerencia")
 
+if st.button("Enviar sugerencia"):
+    st.write(f"Gracias por tu sugerencia, pero esta sección sigue en construcción (es un reto evadir los bots): {sugerencia}")

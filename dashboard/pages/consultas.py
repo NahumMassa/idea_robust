@@ -206,13 +206,3 @@ if time_span:
         songs_not_played = not_played_songs_due_a_date(time_span)
         show_normalized_df(pd.DataFrame(songs_not_played))
 
-#-----------------
-#SUGERENCIA DE CANCIONES
-#-----------------
-
-st.header("¿Sugerencias de canciones?")
-st.write("Esta sección está en construcción... Pero aquí podrás poner tus sugerencias de canciones!")
-sugerencia = st.text_input("Sugerencia")
-
-if st.button("Enviar sugerencia"):
-    st.write(f"Ok, gracias por tu sugerencia, pero todavía no sirve  JAJAJAJAJ: {sugerencia}")
