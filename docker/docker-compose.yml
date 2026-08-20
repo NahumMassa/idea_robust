@@ -42,24 +42,5 @@ services:
     volumes:
       - ..:/app
 
-  uploader:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.uploader
-    container_name: idea_robust_uploader
-    restart: unless-stopped
-    ports:
-      - "8502:8502"
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - ../.env
-    environment:
-      - DB_HOST=db
-    # Live-reload on file save (disable in production)
-    volumes:
-      - ..:/app
-
 volumes:
   postgres_data:

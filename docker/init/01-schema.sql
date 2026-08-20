@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS performances (
 CREATE TABLE IF NOT EXISTS performance_elements (
     id SERIAL PRIMARY KEY,
     performance_id INT NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
-    song_id INT NOT NULL REFERENCES canciones(id),
+    song_id INT NOT NULL REFERENCES songs(id),
     song_order SMALLINT NOT NULL,              -- 1, 2, 3, 4, 5...
     specific_key VARCHAR(10),                  -- Opcional: si ese día la tocaron en un tono distinto al original
     CONSTRAINT uq_performance_song_order UNIQUE (performance_id, song_order)
