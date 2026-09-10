@@ -35,7 +35,9 @@ TONALIDADES = [
     # Menores (con formato '-')
     "C-", "Db-", "D-", "Eb-", "E-", "F-", "Gb-", "G-", "Ab-", "A-", "Bb-", "B-"
 ]
-
+COMPASES = [
+    "4/4", "3/4", "6/8", "7/8", "9/8", "12/8", "16/8", "18/8", "20/8", "22/8", "24/8"
+]
 
 class Songs(Base):
     __tablename__ = "songs"
@@ -180,6 +182,43 @@ class PerformanceElement(Base):
             raise ValueError("Song order cannot be negative")
         return value
 
+class SongChart(Base):
+    __tablename__ = "song_charts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    song_id = Column(Integer, ForeignKey("songs.id", ondelete="CASCADE"), nullable=False, unique=True)
+    structure = Column(Text, nullable=True)
+    chords = Column(Text, nullable=True)
+    time_signature = Column(String(10), default="4/4")
+
+    # Relación inversa
+    song = relationship("Songs", back_populates="chart")
+    @validates("structure")
+    def sanitize_structure(self, key, value):
+        if value is None:
+            raise ValueError("Structure cannot be None")
+        return value
+        """
+        REGEX PARA SEGUIR EL FORMATO 
+        """
+    # Aquí la lógica de ChordPro
+    @validates("chords")
+    def sanitize_chords(self, key, value):
+        if value is None:
+            raise ValueError("Chords cannot be None")
+        return value
+        """
+        AQUÍ LA LÓGICA DE CHORD PRO
+        """
+    @validates("time_signature")
+    def sanitize_time_signature(self, key, value):
+        if value is None:
+            raise ValueError("Time signature cannot be None")
+        if value not in COMPASES:
+            raise ValueError(f"Time signature {value} not found")
+        return value
+
+    __str__ = lambda self: f'song_id {self.song_id}, structure {self.structure}, chords {self.chords}, time_signature {self.time_signature}'
 if __name__ == '__main__':
     print('TEST, QUERY SONGS-------------------')
     print(session.query(Songs).first())
@@ -191,6 +230,7 @@ if __name__ == '__main__':
         tone="C-",
         link_yt="https://youtu.be/xXh0JZvjQSY?si=uH7vfKTJw2KjBaDW"
     )
+
     print(session.add(song))
     session.commit()
     print('TEST, ARTIST SONG -------------------')

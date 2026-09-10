@@ -7,7 +7,7 @@ project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from models import Artist, Genre, Songs, Performance, PerformanceElement, session, TONALIDADES, get_next_sunday_date
+from models import *
 
 conn = st.connection("postgres", type="sql")
 
@@ -145,7 +145,7 @@ with st.expander("creat setlist"):
     seleccion = st.multiselect(
         label="Busca y elige las 5-6 canciones:",
         options=df_all_songs["etiqueta"].tolist(),
-        max_selections=6
+        max_selections=6 
     )
 
     if seleccion:
@@ -158,7 +158,8 @@ with st.expander("creat setlist"):
         
         st.text_area("Copiar para WhatsApp:", value=mensaje, height=160)
 
-### FALTA LÓGICA PARA SUBIR A LA TABLA PERFORMANCE CON FECHA DE HOY U OTR
+#-------------------------|
+# SUBIR PERFORMANCE
 with st.expander("subir performance"):
     check = st.checkbox("Fecha personalizada?")
     date_str = get_next_sunday_date()
@@ -203,4 +204,37 @@ with st.expander("subir performance"):
         except Exception as e:
             session.rollback()
             st.error(f"Error al subir performance: {e}")
-        
+
+#-------------------------
+# AGREFAR ESTRUCTURAS Y ACORDES
+
+with st.expander("Estructura y Acordes (Chart)", expanded=False):
+    structure_input = st.text_input(
+        "Estructura:", 
+        placeholder="IN - V1 - PC - PC - C - V - PC'[2] - C2(2) - BR(4) - C - C - OUT"
+    )
+    chords_input = st.text_area(
+        "Acordes / Progresión:",
+        height=200,
+        placeholder="{c: VERSO}\n| I | IV I | vi V | IV |\n\n{c: PRE-CORO}\n| IV | V | vi  vi, V | IV |\n| II |"
+    )
+
+    time_signature_selected = st.selectbox("Compás", COMPASES)
+
+    song_selected_to_modify = st.selectbox(label="elige la canción:", options=df_all_songs["etiqueta"].tolist())
+
+    if st.button("Subir"):
+        try:
+            song_id = df_all_songs[df_all_songs["id"] == df_all_songs["etiqueta"].index(song_selected_to_modify)]["id"].values[0]
+            song_chart = SongChart(
+                song_id=song_id,
+                structure=structure_input,
+                chords=chords_input,
+                time_signature=time_signature_selected
+            )
+            session.add(song_chart)
+            session.commit()
+            st.success("Estructura y Acordes subidos exitosamente")
+        except Exception as e:
+            session.rollback()
+            st.error(f"Error al subir estructura y acordes: {e}")

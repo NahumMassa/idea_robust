@@ -1,4 +1,4 @@
-from .models import Songs, Artist, Genre, Performance, PerformanceElement, session, TONALIDADES
+from .models import Songs, Artist, Genre, Performance, PerformanceElement, SongChart, session, TONALIDADES, COMPASES
 from .utils import show_normalized_df, get_next_sunday_date
 __all__ = [
     'Songs',
@@ -7,7 +7,9 @@ __all__ = [
     'Performance',
     'session',
     'TONALIDADES',
+    'COMPASES',
     'show_normalized_df',
     'get_next_sunday_date',
-    'PerformanceElement'
+    'PerformanceElement',
+    'SongChart'
 ]
