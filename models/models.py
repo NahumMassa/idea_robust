@@ -3,7 +3,7 @@
 from datetime import datetime
 import re 
 
-from sqlalchemy import Column, Integer, String, Date, Float, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Float, Text, ForeignKey, Table
 from sqlalchemy.orm import sessionmaker, declarative_base, validates, relationship
 from sqlalchemy import create_engine
 
@@ -39,6 +39,15 @@ COMPASES = [
     "4/4", "3/4", "6/8", "7/8", "9/8", "12/8", "16/8", "18/8", "20/8", "22/8", "24/8"
 ]
 
+# Tabla intermedia (pivote) muchos a muchos entre songs y tags.
+# Se define como Table y no como clase porque no tiene columnas propias.
+song_tags = Table(
+    "song_tags",
+    Base.metadata,
+    Column("song_id", Integer, ForeignKey("songs.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
 class Songs(Base):
     __tablename__ = "songs"
     id = Column(Integer, primary_key=True)
@@ -48,6 +57,10 @@ class Songs(Base):
     tempo = Column(Integer)
     tone = Column(String)
     link_yt = Column(String)
+
+    chart = relationship("SongChart", back_populates="song", uselist=False)
+    # passive_deletes: la db ya borra las filas de song_tags con ON DELETE CASCADE
+    tags = relationship("Tag", secondary=song_tags, back_populates="songs", passive_deletes=True)
 
     @classmethod
     def exists(cls, session, title, link_yt):
@@ -135,6 +148,30 @@ class Genre(Base):
         value = value.strip().title()
         if value not in ["Alabanza", "Adoración"]:
             raise ValueError(f"Genre {value} not found")
+        return value
+
+    __str__ = lambda self: f'name {self.name}, id {self.id}'
+
+class Tag(Base):
+    __tablename__ = "tags"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)
+
+    songs = relationship("Songs", secondary=song_tags, back_populates="tags", passive_deletes=True)
+
+    @classmethod
+    def exists(cls, session, name):
+        return session.query(Tag).filter(Tag.name == name.strip().title()).first() is not None
+
+    @validates("name")
+    def sanitize_name(self, key, value):
+        if value is None:
+            raise ValueError("Name cannot be None")
+        value = value.strip().title()
+        if not value:
+            raise ValueError("Name cannot be empty")
+        if len(value) > 50:
+            raise ValueError("Name cannot be longer than 50 characters")
         return value
 
     __str__ = lambda self: f'name {self.name}, id {self.id}'

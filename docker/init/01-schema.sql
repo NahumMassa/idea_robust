@@ -44,12 +44,29 @@ CREATE TABLE IF NOT EXISTS song_charts (
     song_id INT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
     structure TEXT,       -- 'IN - V1 - PC - PC - C - V - OUT'
     chords TEXT,          -- Bloque en formato ChordPro / Grados
-    time_signature VARCHAR(10) DEFAULT '4/4', -- Compás (ej. 4/4, 6/8)
+    time_signature VARCHAR(10) DEFAULT '4/4' -- Compás (ej. 4/4, 6/8)
 );
 
 CREATE INDEX IF NOT EXISTS idx_song_charts_song_id ON song_charts(song_id);
+-- 1. Catálogo de etiquetas disponibles
+CREATE TABLE tags (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- 2. Tabla intermedia (Pivote)
+CREATE TABLE song_tags (
+    song_id INT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    tag_id INT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (song_id, tag_id)
+);
+
+-- Índice para acelerar filtros de "todas las canciones con tag X"
+CREATE INDEX idx_song_tags_tag_id ON song_tags(tag_id);
 
 -- Índices recomendados para búsquedas rápidas
 CREATE INDEX idx_performances_played_at ON performances(played_at);
 CREATE INDEX idx_performance_elements_perf_id ON performance_elements(performance_id);
 CREATE INDEX idx_performance_elements_song_id ON performance_elements(song_id);
+
+

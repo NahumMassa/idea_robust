@@ -1,6 +1,6 @@
 import sys
+from datetime import datetime
 from pathlib import Path
-import pandas as pd
 import streamlit as st
 
 project_root = Path(__file__).resolve().parents[2]
@@ -39,10 +39,8 @@ if not st.session_state.get("admin_authenticated"):
 
 st.header("Panel de administrador")
 
-tonos = TONALIDADES[:]
-
 #---------------------
-# FUNCIONES 
+# FUNCIONES
 
 def get_or_create_artist(name: str) -> Artist:
     normalized = name.strip().title()
@@ -61,60 +59,101 @@ def get_genre_id(name: str) -> int:
         raise ValueError(f"Género no encontrado: {name}")
     return genre.id
 
+
+def get_or_create_tags(names: list[str]) -> list[Tag]:
+    """
+    Devuelve los Tag para cada nombre. Los que ya existen en la tabla tags se
+    reutilizan y los que no, se crean. Ignora vacíos y duplicados.
+    """
+    # misma normalización que Tag.sanitize_name, para comparar contra la db
+    normalized = list(dict.fromkeys(n.strip().title() for n in names if n and n.strip()))
+    if not normalized:
+        return []
+
+    existing = {tag.name: tag for tag in session.query(Tag).filter(Tag.name.in_(normalized))}
+    tags = []
+    for name in normalized:
+        tag = existing.get(name)
+        if tag is None:
+            tag = Tag(name=name)
+            session.add(tag)
+        tags.append(tag)
+    session.flush()
+    return tags
+
+#---------------------
+# DATOS COMPARTIDOS
+# TTL 0, PARA QUE AL AGREGAR CANCIONES APAREZCAN y no se use el caché
+
+df_all_songs = conn.query("""select s.id,
+                                s.title,
+                                a.name as artist,
+                                s.link_yt,
+                                s.tempo
+                            from songs s
+                            left join artist a on artist_id = a.id
+                            order by s.title;""", ttl=0)
+# el tempo solo es para que al elegirla, sepa ponerla de más lenta a rápida
+song_labels = {
+    int(row.id): f"{row.title} - {row.artist} - {row.tempo}"
+    for row in df_all_songs.itertuples()
+}
+song_ids = list(song_labels)
+
+tag_names = conn.query("SELECT name FROM tags ORDER BY name", ttl=0)["name"].tolist()
+
+tab_song, tab_tags, tab_setlist, tab_chart = st.tabs(
+    ["🎵 Nueva canción", "🏷️ Etiquetas", "📋 Setlist", "🎸 Chart"]
+)
+
 #--------------------------
 # AGREGAR CANCIÓN
 
-with st.expander("agregar canción"):
-    # TÍTULO
-    title = st.text_input("Título")
-    title = title.title().strip()
-
-    # ARTISTA
-    check_artist = st.checkbox("Agregar artista ya existente")
-    if check_artist:
-        st.write("Va a agregar un artista ya existente de la base de datos")
-        artist_names = conn.query("SELECT name FROM artist")["name"].tolist()
-        artist = st.selectbox("Artista", artist_names)
-    else:
-        artist = st.text_input("Nuevo artista")
-        artist = artist.title().strip()
-
-    # GÉNERO
+with tab_song:
+    artist_names = conn.query("SELECT name FROM artist ORDER BY name", ttl=0)["name"].tolist()
     genre_names = conn.query("SELECT name FROM genre")["name"].tolist()
-    genre = st.selectbox("Género", genre_names)
 
-    # TEMPO
-    tempo = st.slider("Tempo", 40, 250)
+    with st.form("new_song", clear_on_submit=True):
+        title = st.text_input("Título")
+        # permite elegir un artista existente o escribir uno nuevo
+        artist = st.selectbox(
+            "Artista", artist_names, index=None,
+            placeholder="Elige o escribe un artista nuevo",
+            accept_new_options=True,
+        )
+        link = st.text_input("Link de YouTube")
 
-    # TONO
-    tone_selected = st.selectbox("Tono", tonos)
+        col1, col2 = st.columns(2)
+        genre = col1.selectbox("Género", genre_names)
+        tone_selected = col2.selectbox("Tono", TONALIDADES)
+        tempo = st.slider("Tempo", 40, 250)
 
-    #LINK
-    link = st.text_input("Link de YouTube")
-    link = link.strip()
+        new_song_tags = st.multiselect(
+            "Etiquetas", tag_names,
+            placeholder="Elige o escribe etiquetas nuevas",
+            accept_new_options=True,
+        )
 
-    submit_button = st.button("Subir canción")
+        submitted = st.form_submit_button("Subir canción", type="primary")
 
-    if submit_button:
+    if submitted:
         try:
-            if check_artist:
-                artist_obj = session.query(Artist).filter_by(name=artist).first()
-                if not artist_obj:
-                    raise ValueError(f"Artista no encontrado: {artist}")
-            else:
-                artist_obj = get_or_create_artist(artist)
-
+            if not artist:
+                raise ValueError("Falta el artista")
+            title = title.strip().title()
+            link = link.strip()
             if Songs.exists(session, title, link):
                 st.warning("Esta canción ya existe en la base de datos")
             else:
                 song = Songs(
                     title=title,
-                    artist_id=artist_obj.id,
+                    artist_id=get_or_create_artist(artist).id,
                     genre_id=get_genre_id(genre),
                     tempo=tempo,
                     tone=tone_selected,
                     link_yt=link,
                 )
+                song.tags = get_or_create_tags(new_song_tags)
                 session.add(song)
                 session.commit()
                 st.success(f"✅ Canción agregada: {song.title} ({tone_selected} con link {song.link_yt})")
@@ -122,119 +161,127 @@ with st.expander("agregar canción"):
             session.rollback()
             st.error(f"❌ Error al agregar la canción: {e}")
 
-#-------------------------
-# CREAR SETLIST 
+#--------------------------
+# ETIQUETAS DE UNA CANCIÓN
 
-with st.expander("creat setlist"):
-
-    st.subheader("📋 Seleccionar Setlist del Domingo")
-
-    # 1. Simulación de datos (o tu df_all_songs obtenido de PostgreSQL)
-    df_all_songs = pd.DataFrame(conn.query("""select s.title,
-                                                s.id,
-                                                a.name as artist,
-                                                s.link_yt,
-                                                s.tempo
-                                            from songs s
-                                            left join artist a on artist_id = a.id;""", ttl=0))
-                                            #TTL 0, PARA QUE AL AGREGAR CANCIONES APAREZCAN y no se use el caché
-
-    # Creamos una columna auxiliar descriptiva para identificar cada opción
-    df_all_songs["etiqueta"] = df_all_songs["title"] + " - " + df_all_songs["artist"] + " - " + df_all_songs["tempo"].astype(str)
-    #el tempo solo es para que al elegirs, sepa ponerla de más lenta a rápida
-    seleccion = st.multiselect(
-        label="Busca y elige las 5-6 canciones:",
-        options=df_all_songs["etiqueta"].tolist(),
-        max_selections=6 
+with tab_tags:
+    tag_song_id = st.selectbox(
+        "Canción", song_ids, index=None,
+        format_func=song_labels.get, placeholder="Busca una canción",
+        key="tag_song",
     )
 
-    if seleccion:
-        df_setlist = df_all_songs[df_all_songs["etiqueta"].isin(seleccion)]
-        
+    if tag_song_id is not None:
+        song = session.get(Songs, tag_song_id)
+        # key por canción para que el default se recargue al cambiar de canción
+        selected_tags = st.multiselect(
+            "Etiquetas", tag_names,
+            default=[tag.name for tag in song.tags],
+            placeholder="Elige o escribe etiquetas nuevas",
+            accept_new_options=True,
+            key=f"tags_{tag_song_id}",
+        )
+
+        if st.button("Guardar etiquetas", type="primary"):
+            try:
+                # la lista elegida reemplaza a la anterior: quitar una etiqueta la desasigna
+                song.tags = get_or_create_tags(selected_tags)
+                session.commit()
+                st.success(f"✅ Etiquetas guardadas para {song.title}")
+            except Exception as e:
+                session.rollback()
+                st.error(f"❌ Error al guardar etiquetas: {e}")
+
+#-------------------------
+# CREAR SETLIST Y SUBIR PERFORMANCE
+
+with tab_setlist:
+    setlist_ids = st.multiselect(
+        "Busca y elige las 5-6 canciones:",
+        song_ids,
+        format_func=song_labels.get,
+        max_selections=6,
+    )
+
+    if setlist_ids:
+        df_setlist = df_all_songs.set_index("id").loc[setlist_ids]
+
         mensaje = "*🎶 SETLIST DEL SERVICIO 🎶*\n\n"
-        mensaje = f"{'*CANCIÓN*'} | {'*ARTISTA*'} | {'*LINK*'}\n"
-        for idx, (_, row) in enumerate(df_setlist.iterrows(), 1):
-            mensaje += f"> *{row['title']}* | {row['artist']} | {row['link_yt']} \n"
-        
+        mensaje += "*CANCIÓN* | *ARTISTA* | *LINK*\n"
+        for row in df_setlist.itertuples():
+            mensaje += f"> *{row.title}* | {row.artist} | {row.link_yt} \n"
+
         st.text_area("Copiar para WhatsApp:", value=mensaje, height=160)
 
-#-------------------------|
-# SUBIR PERFORMANCE
-with st.expander("subir performance"):
-    check = st.checkbox("Fecha personalizada?")
-    date_str = get_next_sunday_date()
-    
-    if check:
-        st.write(f" fecha natural: {date_str}")
-        date_str = st.text_input("ponga la fecha con formato YYYY-MM-DD")
+    st.divider()
+
+    col1, col2 = st.columns([1, 2])
+    played_at = col1.date_input(
+        "Fecha del servicio",
+        value=datetime.strptime(get_next_sunday_date(), "%Y-%m-%d").date(),
+    )
+    notes_for_performance = col2.text_input("Notas para el performance")
+
+    if st.button("Registrar performance", type="primary", disabled=not setlist_ids):
         try:
-            get_next_sunday_date(date_str)  
-            st.write("Fecha válida")
-        except ValueError as e:
-            st.error(f"Error: {e}")
-
-
-    #NOTAS 
-    notes_for_performance = st.text_input("Notas para el performance")
-
-    if st.button("Upload"):
-        try:
-            performance = Performance(played_at=date_str,
+            performance = Performance(played_at=played_at,
                 service_type="Domingo",
                 notes=notes_for_performance
                 )
-            
-            session.add(performance)
-            #tengo que hacer un flush porque al hacer append directamente a la lista de elementos, 
-            # no se le asigna un id hasta que se hace flush o commit
-            session.flush()
-            #st.write(performance.id)
-            for i, (_, row) in enumerate(df_setlist.iterrows(), 1):
-                performance_element = PerformanceElement(
-                    performance_id=performance.id,
-                    song_id=row["id"],
-                    song_order=i
+            for i, song_id in enumerate(setlist_ids, 1):
+                performance.elements.append(
+                    PerformanceElement(song_id=song_id, song_order=i)
                 )
-
-                session.add(performance_element)
             session.add(performance)
             session.commit()
-                
+
             st.success("Performance subida exitosamente")
         except Exception as e:
             session.rollback()
             st.error(f"Error al subir performance: {e}")
 
 #-------------------------
-# AGREFAR ESTRUCTURAS Y ACORDES
+# AGREGAR ESTRUCTURAS Y ACORDES
 
-with st.expander("Estructura y Acordes (Chart)", expanded=False):
-    structure_input = st.text_input(
-        "Estructura:", 
-        placeholder="IN - V1 - PC - PC - C - V - PC'[2] - C2(2) - BR(4) - C - C - OUT"
-    )
-    chords_input = st.text_area(
-        "Acordes / Progresión:",
-        height=200,
-        placeholder="{c: VERSO}\n| I | IV I | vi V | IV |\n\n{c: PRE-CORO}\n| IV | V | vi  vi, V | IV |\n| II |"
+with tab_chart:
+    chart_song_id = st.selectbox(
+        "Canción", song_ids, index=None,
+        format_func=song_labels.get, placeholder="Busca una canción",
+        key="chart_song",
     )
 
-    time_signature_selected = st.selectbox("Compás", COMPASES)
+    if chart_song_id is not None:
+        # si la canción ya tiene chart, se edita en lugar de crear otro (song_id es único)
+        chart = session.query(SongChart).filter_by(song_id=chart_song_id).first()
 
-    song_selected_to_modify = st.selectbox(label="elige la canción:", options=df_all_songs["etiqueta"].tolist())
-
-    if st.button("Subir"):
-        try:
-            song_id = df_all_songs[df_all_songs["id"] == df_all_songs["etiqueta"].index(song_selected_to_modify)]["id"].values[0]
-            song_chart = SongChart(
-                song_id=song_id,
-                structure=structure_input,
-                chords=chords_input,
-                time_signature=time_signature_selected
+        with st.form(f"chart_{chart_song_id}"):
+            structure_input = st.text_input(
+                "Estructura:",
+                value=chart.structure if chart else "",
+                placeholder="IN - V1 - PC - PC - C - V - PC'[2] - C2(2) - BR(4) - C - C - OUT"
             )
-            session.add(song_chart)
-            session.commit()
-            st.success("Estructura y Acordes subidos exitosamente")
-        except Exception as e:
-            session.rollback()
-            st.error(f"Error al subir estructura y acordes: {e}")
+            chords_input = st.text_area(
+                "Acordes / Progresión:",
+                value=chart.chords if chart else "",
+                height=200,
+                placeholder="{c: VERSO}\n| I | IV I | vi V | IV |\n\n{c: PRE-CORO}\n| IV | V | vi  vi, V | IV |\n| II |"
+            )
+            time_signature_selected = st.selectbox(
+                "Compás", COMPASES,
+                index=COMPASES.index(chart.time_signature) if chart and chart.time_signature in COMPASES else 0,
+            )
+            submitted_chart = st.form_submit_button("Guardar chart", type="primary")
+
+        if submitted_chart:
+            try:
+                if chart is None:
+                    chart = SongChart(song_id=chart_song_id)
+                    session.add(chart)
+                chart.structure = structure_input
+                chart.chords = chords_input
+                chart.time_signature = time_signature_selected
+                session.commit()
+                st.success("Estructura y Acordes subidos exitosamente")
+            except Exception as e:
+                session.rollback()
+                st.error(f"Error al subir estructura y acordes: {e}")

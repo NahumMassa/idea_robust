@@ -27,7 +27,7 @@ sunday_date = get_next_sunday_date()
 st.header("Setlist del Domingo")
 
 
-@st.cache_data(ttl="5d")
+@st.cache_data(ttl="12h")
 def get_sunday_setlist(sunday_date: str):
     """
     Retorna el setlist dado una fecha de domingo.
