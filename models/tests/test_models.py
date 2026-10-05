@@ -23,7 +23,10 @@ from sqlalchemy.orm import sessionmaker, configure_mappers
 # so Streamlit is never imported as a side effect.
 # ---------------------------------------------------------------------------
 
-_models_path = Path(__file__).resolve().parent.parent / "models.py"
+_models_dir = Path(__file__).resolve().parent.parent
+_models_path = _models_dir / "models.py"
+# models.py importa chords.py; sin paquete se resuelve con models/ en sys.path
+sys.path.insert(0, str(_models_dir))
 
 with patch("sqlalchemy.create_engine", return_value=MagicMock()), \
      patch("sqlalchemy.orm.sessionmaker", return_value=MagicMock()):
@@ -336,3 +339,23 @@ class TestTag:
         rows = session.execute(song_tags.select().where(song_tags.c.song_id == song.id)).fetchall()
         assert [r.tag_id for r in rows] == [rapida.id]
         assert Tag.exists(session, "Navidad") is True
+
+
+class TestSongChartChords:
+    def test_chords_are_normalized_to_chordpro(self):
+        chart = _mod.SongChart(chords="VERSO\n| G | Em D |")
+        assert chart.chords == "{c: VERSO}\n| [G] | [E-] [D] |"
+
+    def test_invalid_chords_raise(self):
+        with pytest.raises(ValueError, match="acorde inválido"):
+            _mod.SongChart(chords="| G | H |")
+
+
+class TestSongChartStructure:
+    def test_structure_is_normalized(self):
+        chart = _mod.SongChart(structure="c1 - v1 -")
+        assert chart.structure == "C1 - V1"
+
+    def test_invalid_structure_raise(self):
+        with pytest.raises(ValueError, match="no es válida"):
+            _mod.SongChart(structure="IN - V 1")

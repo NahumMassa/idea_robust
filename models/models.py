@@ -11,6 +11,13 @@ from os import getenv
 from pathlib import Path
 from dotenv import load_dotenv
 
+try:
+    from .chords import normalize_chords
+    from .structure import normalize_structure
+except ImportError:  # models.py cargado fuera del paquete (tests, __main__)
+    from chords import normalize_chords
+    from structure import normalize_structure
+
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(env_path)
 
@@ -230,23 +237,19 @@ class SongChart(Base):
 
     # Relación inversa
     song = relationship("Songs", back_populates="chart")
+    # separa las partes por '-' y las guarda normalizadas (ver structure.py)
     @validates("structure")
     def sanitize_structure(self, key, value):
         if value is None:
             raise ValueError("Structure cannot be None")
-        return value
-        """
-        REGEX PARA SEGUIR EL FORMATO 
-        """
-    # Aquí la lógica de ChordPro
+        return normalize_structure(value)
+
+    # valida el cifrado americano y lo guarda normalizado en ChordPro (ver chords.py)
     @validates("chords")
     def sanitize_chords(self, key, value):
         if value is None:
             raise ValueError("Chords cannot be None")
-        return value
-        """
-        AQUÍ LA LÓGICA DE CHORD PRO
-        """
+        return normalize_chords(value)
     @validates("time_signature")
     def sanitize_time_signature(self, key, value):
         if value is None:

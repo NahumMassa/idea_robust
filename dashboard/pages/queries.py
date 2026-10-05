@@ -81,6 +81,13 @@ def get_or_create_tags(names: list[str]) -> list[Tag]:
     session.flush()
     return tags
 
+def chords_for_editing(chords: str) -> str:
+    """Acordes guardados sin corchetes; si vienen de un formato anterior, tal cual."""
+    try:
+        return to_plain(parse_chart(chords))
+    except ValueError:
+        return chords
+
 #---------------------
 # DATOS COMPARTIDOS
 # TTL 0, PARA QUE AL AGREGAR CANCIONES APAREZCAN y no se use el caché
@@ -253,18 +260,32 @@ with tab_chart:
     if chart_song_id is not None:
         # si la canción ya tiene chart, se edita en lugar de crear otro (song_id es único)
         chart = session.query(SongChart).filter_by(song_id=chart_song_id).first()
+        song = session.get(Songs, chart_song_id)
+
+        if song.link_yt:
+            st.link_button("▶️ Ver en YouTube", song.link_yt)
 
         with st.form(f"chart_{chart_song_id}"):
+            col1, col2 = st.columns(2)
+            song_tone = col1.selectbox(
+                "Tono", TONALIDADES,
+                index=TONALIDADES.index(song.tone) if song.tone in TONALIDADES else None,
+            )
+            song_tempo = col2.number_input("Tempo (BPM)", min_value=1, max_value=300, value=song.tempo)
+            song_link = st.text_input("Link de YouTube", value=song.link_yt or "")
             structure_input = st.text_input(
                 "Estructura:",
                 value=chart.structure if chart else "",
-                placeholder="IN - V1 - PC - PC - C - V - PC'[2] - C2(2) - BR(4) - C - C - OUT"
+                placeholder="IN - V1 - PC - PC - C - V - PC'[2] - C2(2) - BR(4) - C - C - OUT",
+                help="Partes separadas por '-', con o sin espacios. Se guardan en mayúsculas.",
             )
             chords_input = st.text_area(
                 "Acordes / Progresión:",
-                value=chart.chords if chart else "",
+                # se edita sin corchetes; al guardar se normaliza a ChordPro
+                value=chords_for_editing(chart.chords) if chart and chart.chords else "",
                 height=200,
-                placeholder="{c: VERSO}\n| I | IV I | vi V | IV |\n\n{c: PRE-CORO}\n| IV | V | vi  vi, V | IV |\n| II |"
+                placeholder="VERSO\n| G | C G | E- D | C |\n\nPRE-CORO\n| C | D | E- E-, D | C |\n| A |",
+                help="Cifrado americano por compás. Corchetes opcionales; menores con '-' o 'm'.",
             )
             time_signature_selected = st.selectbox(
                 "Compás", COMPASES,
@@ -280,8 +301,25 @@ with tab_chart:
                 chart.structure = structure_input
                 chart.chords = chords_input
                 chart.time_signature = time_signature_selected
+                # los acordes no se transponen al cambiar el tono: se guardan tal como se escribieron
+                song.tone = song_tone
+                song.tempo = song_tempo
+                song.link_yt = song_link
                 session.commit()
-                st.success("Estructura y Acordes subidos exitosamente")
+                st.success("Canción, estructura y acordes guardados exitosamente")
             except Exception as e:
                 session.rollback()
-                st.error(f"Error al subir estructura y acordes: {e}")
+                st.error(f"Error al guardar la canción, estructura y acordes: {e}")
+
+        # vista previa transpuesta, solo entre tonos del mismo modo que el original
+        if chart and chart.chords and song.tone:
+            same_mode = [t for t in TONALIDADES if t.endswith("-") == song.tone.endswith("-")]
+            view_tone = st.selectbox(
+                "Ver en tono", same_mode, index=same_mode.index(song.tone),
+                key=f"view_tone_{chart_song_id}",
+            )
+            try:
+                sections = transpose_sections(parse_chart(chart.chords), song.tone, view_tone)
+                st.code(to_plain(sections), language=None)
+            except ValueError as e:
+                st.warning(f"No se pueden transponer los acordes guardados: {e}")

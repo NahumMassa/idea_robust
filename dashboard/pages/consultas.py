@@ -8,7 +8,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from models import TONALIDADES
-from models.utils import show_normalized_df, get_next_sunday_date, TIME_FORMAT
+from models.utils import show_normalized_df, get_next_sunday_date, render_song_card, TIME_FORMAT
 
 
 st.set_page_config(page_title="Consultas", page_icon="🔎")
@@ -109,6 +109,7 @@ where = ("WHERE " + "\n  AND ".join(conditions)) if conditions else ""
 # TTL 0 para que las canciones nuevas aparezcan sin esperar al caché
 songs = conn.query(f"""
     SELECT
+        s.id,
         s.title,
         a.name AS artist,
         g.name AS genre,
@@ -140,7 +141,7 @@ col3.metric("Tonos", songs["tone"].nunique())
 if songs.empty:
     st.warning("Ninguna canción cumple con todos los filtros.")
 else:
-    show_normalized_df(songs, extra_config={
+    show_normalized_df(songs.drop(columns="id"), extra_config={
         "title": "Canción",
         "artist": "Artista",
         "genre": "Género",
@@ -148,3 +149,36 @@ else:
         "tags": "Etiquetas",
         "last_played": st.column_config.DateColumn("Última vez tocada", format="YYYY-MM-DD"),
     })
+
+#--------------------------------
+# DETALLE DE UNA CANCIÓN
+# Misma tarjeta que el setlist del domingo, una canción a la vez.
+#--------------------------------
+
+if not songs.empty:
+    st.divider()
+    st.subheader("Estructura y Acordes de una Canción")
+    song_labels = {int(row.id): f"{row.title} - {row.artist}" for row in songs.itertuples()}
+    song_id = st.selectbox(
+        "Canción", list(song_labels), index=None,
+        format_func=song_labels.get, placeholder="Elige una de las canciones filtradas",
+        label_visibility="collapsed",
+    )
+
+    if song_id is not None:
+        song = conn.query("""
+            SELECT
+                s.title,
+                a.name AS artist,
+                s.tempo,
+                s.tone,
+                s.link_yt,
+                sc.time_signature,
+                sc.structure,
+                sc.chords
+            FROM songs s
+            LEFT JOIN artist a ON a.id = s.artist_id
+            LEFT JOIN song_charts sc ON sc.song_id = s.id
+            WHERE s.id = :song_id
+        """, params={"song_id": song_id}, ttl=0)
+        render_song_card(next(song.itertuples()), key=f"consulta_{song_id}")
