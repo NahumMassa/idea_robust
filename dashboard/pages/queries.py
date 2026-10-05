@@ -35,6 +35,7 @@ if not st.session_state.get("admin_authenticated"):
     st.caption(
         "Token no es el mismo"
     )
+    show_footer()
     st.stop()
 
 st.header("Panel de administrador")
@@ -323,3 +324,5 @@ with tab_chart:
                 st.code(to_plain(sections), language=None)
             except ValueError as e:
                 st.warning(f"No se pueden transponer los acordes guardados: {e}")
+
+show_footer()

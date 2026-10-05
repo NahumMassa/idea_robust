@@ -8,7 +8,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from models import TONALIDADES
-from models.utils import show_normalized_df, get_next_sunday_date, render_song_card, TIME_FORMAT
+from models.utils import show_normalized_df, get_next_sunday_date, render_song_card, show_footer, TIME_FORMAT
 
 
 st.set_page_config(page_title="Consultas", page_icon="🔎")
@@ -182,3 +182,5 @@ if not songs.empty:
             WHERE s.id = :song_id
         """, params={"song_id": song_id}, ttl=0)
         render_song_card(next(song.itertuples()), key=f"consulta_{song_id}")
+
+show_footer()

@@ -10,7 +10,7 @@ if str(project_root) not in sys.path:
 from sqlalchemy import select
 from models import (
     Songs, Artist, Performance, PerformanceElement, SongChart,
-    get_next_sunday_date, session, render_song_card,
+    get_next_sunday_date, session, render_song_card, show_footer,
 )
 
 st.set_page_config(page_title="Setlist Domingo", page_icon="🎼")
@@ -75,3 +75,5 @@ else:
 
 for i, row in enumerate(df.itertuples(), 1):
     render_song_card(row, key=f"setlist_{i}", number=i)
+
+show_footer()

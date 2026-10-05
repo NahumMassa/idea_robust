@@ -13,6 +13,9 @@ from .models import TONALIDADES
 
 TIME_FORMAT = "%Y-%m-%d"
 
+# versión de la app (SemVer); se cambia aquí y al crear el tag de git vX.Y.Z
+APP_VERSION = "1.0.0"
+
 # Configuraciones globales predeterminadas de tu app
 DEFAULT_COLUMN_CONFIG = {
     "link_yt": st.column_config.LinkColumn(
@@ -158,6 +161,16 @@ def render_song_card(row, key: str, number: int | None = None) -> None:
             st.code(chords_for_report(row.chords, original_tone, view_tone), language=None)
         else:
             st.caption("Sin acordes registrados")
+
+
+def show_footer() -> None:
+    """Pie de página con la versión; se llama al final de cada página."""
+    st.divider()
+    st.markdown(
+        f"<p style='text-align: center; opacity: 0.6; font-size: 0.8rem;'>"
+        f"IDEA Mérida · Ministerio de Alabanza · v{APP_VERSION}</p>",
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
