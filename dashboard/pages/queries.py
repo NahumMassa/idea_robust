@@ -242,11 +242,19 @@ with tab_setlist:
                 )
             session.add(performance)
             session.commit()
+            get_sunday_setlist.clear()
 
             st.success("Performance subida exitosamente")
         except Exception as e:
             session.rollback()
             st.error(f"Error al subir performance: {e}")
+
+    st.divider()
+    # la página del setlist guarda en caché la consulta (ttl de 10 min);
+    # esto la fuerza a leer de nuevo la db en su siguiente carga
+    if st.button("🔄 Refrescar setlist del domingo"):
+        get_sunday_setlist.clear()
+        st.success("Listo: el setlist del domingo mostrará los datos actuales al recargar la página")
 
 #-------------------------
 # AGREGAR ESTRUCTURAS Y ACORDES
@@ -307,6 +315,7 @@ with tab_chart:
                 song.tempo = song_tempo
                 song.link_yt = song_link
                 session.commit()
+                get_sunday_setlist.clear()
                 st.success("Canción, estructura y acordes guardados exitosamente")
             except Exception as e:
                 session.rollback()

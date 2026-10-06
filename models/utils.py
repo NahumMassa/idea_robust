@@ -5,9 +5,11 @@ import pandas as pd
 
 from datetime import datetime, timedelta
 
+from sqlalchemy import select
+
 from .chords import parse_chart, to_plain, transpose_sections, parse_tone
 from .structure import parse_structure
-from .models import TONALIDADES
+from .models import TONALIDADES, Songs, Artist, Performance, PerformanceElement, SongChart, session
 
 
 
@@ -161,6 +163,39 @@ def render_song_card(row, key: str, number: int | None = None) -> None:
             st.code(chords_for_report(row.chords, original_tone, view_tone), language=None)
         else:
             st.caption("Sin acordes registrados")
+
+
+#---------------------
+# SETLIST DEL DOMINGO
+# Vive aquí (y no en la página) para que el panel de administrador pueda
+# limpiar su caché con get_sunday_setlist.clear() sin esperar al ttl.
+
+@st.cache_data(ttl="10m")
+def get_sunday_setlist(sunday_date: str) -> pd.DataFrame:
+    """
+    Retorna el setlist dado una fecha de domingo, con su chart, en orden.
+    """
+    query = (
+        select(
+            Songs.title,
+            Artist.name.label("artist"),
+            Songs.tempo,
+            Songs.tone,
+            Songs.link_yt,
+            PerformanceElement.specific_key,
+            SongChart.time_signature,
+            SongChart.structure,
+            SongChart.chords,
+        )
+        .select_from(PerformanceElement)
+        .join(Performance, PerformanceElement.performance_id == Performance.id)
+        .outerjoin(Songs, PerformanceElement.song_id == Songs.id)
+        .outerjoin(Artist, Songs.artist_id == Artist.id)
+        .outerjoin(SongChart, SongChart.song_id == Songs.id)
+        .where(Performance.played_at == sunday_date)
+        .order_by(PerformanceElement.song_order)
+    )
+    return pd.read_sql(query, session.bind)
 
 
 def show_footer() -> None:
