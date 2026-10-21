@@ -46,13 +46,13 @@ textColor = "#2C2C2C"
 # ---------------------------------------------------------------------------
 [theme.dark]
 primaryColor = "#D4AF37"
-backgroundColor = "#1E1E1E"
-secondaryBackgroundColor = "#2A2A2A"
+backgroundColor = "#0B1A2E"
+secondaryBackgroundColor = "#13263F"
 textColor = "#F5F5F5"
 
 [theme.dark.sidebar]
-backgroundColor = "#171717"
-secondaryBackgroundColor = "#242424"
+backgroundColor = "#081426"
+secondaryBackgroundColor = "#10203A"
 textColor = "#F5F5F5"
 
 # ---------------------------------------------------------------------------

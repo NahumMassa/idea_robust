@@ -1,7 +1,7 @@
 from .models import Songs, Artist, Genre, Performance, PerformanceElement, SongChart, Tag, song_tags, session, TONALIDADES, COMPASES
 from .chords import parse_chart, to_plain, normalize_chords, transpose_sections
 from .structure import parse_structure, normalize_structure
-from .utils import show_normalized_df, get_next_sunday_date, render_song_card, show_footer, get_sunday_setlist, APP_VERSION
+from .utils import show_normalized_df, get_next_sunday_date, render_song_card, show_footer, get_sunday_setlist, get_sunday_setlist_pdf, clear_sunday_setlist_cache, APP_VERSION
 __all__ = [
     'Songs',
     'Artist',
@@ -15,6 +15,8 @@ __all__ = [
     'render_song_card',
     'show_footer',
     'get_sunday_setlist',
+    'get_sunday_setlist_pdf',
+    'clear_sunday_setlist_cache',
     'APP_VERSION',
     'PerformanceElement',
     'SongChart',

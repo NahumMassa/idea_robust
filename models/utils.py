@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
+from fpdf import FPDF
 
 from .chords import parse_chart, to_plain, transpose_sections, parse_tone
 from .structure import parse_structure
@@ -16,7 +17,7 @@ from .models import TONALIDADES, Songs, Artist, Performance, PerformanceElement,
 TIME_FORMAT = "%Y-%m-%d"
 
 # versión de la app (SemVer); se cambia aquí y al crear el tag de git vX.Y.Z
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # Configuraciones globales predeterminadas de tu app
 DEFAULT_COLUMN_CONFIG = {
@@ -168,7 +169,7 @@ def render_song_card(row, key: str, number: int | None = None) -> None:
 #---------------------
 # SETLIST DEL DOMINGO
 # Vive aquí (y no en la página) para que el panel de administrador pueda
-# limpiar su caché con get_sunday_setlist.clear() sin esperar al ttl.
+# limpiar su caché (y la del PDF) con clear_sunday_setlist_cache() sin esperar al ttl.
 
 @st.cache_data(ttl="10m")
 def get_sunday_setlist(sunday_date: str) -> pd.DataFrame:
@@ -196,6 +197,154 @@ def get_sunday_setlist(sunday_date: str) -> pd.DataFrame:
         .order_by(PerformanceElement.song_order)
     )
     return pd.read_sql(query, session.bind)
+
+
+def pdf_text(text) -> str:
+    # shortcut: las fuentes base del PDF solo traen latin-1 (acentos y ñ sí);
+    # lo demás (emojis, →) sale como '?'. Si estorba, cargar una fuente TTF.
+    return str(text).encode("latin-1", "replace").decode("latin-1")
+
+
+# colores (fondo, texto) parecidos a los badges de Streamlit en la tarjeta de canción
+PDF_TEXT = (49, 51, 63)
+PDF_MUTED = (128, 132, 149)
+PDF_BORDER = (220, 222, 228)
+PDF_CODE = ((240, 242, 246), PDF_TEXT)
+PDF_ORANGE = ((255, 236, 217), (184, 92, 0))
+PDF_BLUE = ((224, 236, 255), (28, 99, 214))
+PDF_GREEN = ((223, 245, 229), (23, 128, 61))
+CARD_PAD = 5
+
+
+def pdf_badge(pdf: FPDF, text: str, colors, font=("Helvetica", "B", 9)) -> None:
+    """Etiqueta con fondo redondeado; salta de renglón si no cabe."""
+    bg, fg = colors
+    pdf.set_font(*font)
+    text = pdf_text(text)
+    w, h = pdf.get_string_width(text) + 4, 5.5
+    if pdf.get_x() + w > pdf.w - pdf.r_margin:
+        pdf.ln(h + 1.5)
+    pdf.set_fill_color(*bg)
+    pdf.rect(pdf.get_x(), pdf.get_y(), w, h, style="F", round_corners=True, corner_radius=1.2)
+    pdf.set_text_color(*fg)
+    pdf.cell(w, h, text, align="C")
+    pdf.set_x(pdf.get_x() + 1.5)
+
+
+def pdf_label(pdf: FPDF, text: str) -> None:
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*PDF_TEXT)
+    pdf.cell(0, 6, text, new_x="LMARGIN", new_y="NEXT")
+
+
+def pdf_empty(pdf: FPDF, text: str) -> None:
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(*PDF_MUTED)
+    pdf.cell(0, 5, text, new_x="LMARGIN", new_y="NEXT")
+
+
+def pdf_song(pdf: FPDF, row, number: int, with_chords: bool) -> None:
+    """Contenido de la tarjeta, igual que render_song_card pero sin YouTube ni selector de tono."""
+    original_tone = row.tone if has_value(row.tone) else None
+    tone = row.specific_key if has_value(row.specific_key) else original_tone
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*PDF_TEXT)
+    pdf.multi_cell(0, 7, pdf_text(f"{number} · {row.title}"), new_x="LMARGIN", new_y="NEXT")
+    if has_value(row.artist):
+        pdf_empty(pdf, pdf_text(row.artist))
+
+    badges = []
+    if tone:
+        note = f" (original {original_tone})" if original_tone and tone != original_tone else ""
+        badges.append((f"Tono {tone}{note}", PDF_ORANGE))
+    if has_value(row.tempo):
+        badges.append((f"{int(row.tempo)} BPM", PDF_BLUE))
+    if has_value(row.time_signature):
+        badges.append((row.time_signature, PDF_GREEN))
+    if badges:
+        pdf.ln(2)
+        for text, colors in badges:
+            pdf_badge(pdf, text, colors)
+        pdf.ln(5.5)
+
+    pdf_label(pdf, "Estructura")
+    if has_value(row.structure):
+        try:
+            parts = parse_structure(row.structure)
+        except ValueError:
+            parts = [row.structure]  # formato anterior: se muestra tal cual
+        for n, part in enumerate(parts):
+            if n:
+                pdf.set_text_color(*PDF_MUTED)
+                pdf.cell(4, 5.5, "»", align="C")
+                pdf.set_x(pdf.get_x() + 1.5)
+            pdf_badge(pdf, part, PDF_CODE, font=("Courier", "", 9))
+        pdf.ln(5.5)
+    else:
+        pdf_empty(pdf, "Sin estructura registrada")
+
+    if with_chords:
+        pdf_label(pdf, "Acordes")
+        if has_value(row.chords):
+            pdf.set_font("Courier", "", 9)  # monoespaciada para que los compases se alineen
+            pdf.set_fill_color(*PDF_CODE[0])
+            pdf.set_text_color(*PDF_TEXT)
+            pdf.multi_cell(0, 4.5, pdf_text(chords_for_report(row.chords, original_tone, tone)),
+                           fill=True, padding=3, new_x="LMARGIN", new_y="NEXT")
+        else:
+            pdf_empty(pdf, "Sin acordes registrados")
+
+
+def pdf_card(pdf: FPDF, draw) -> None:
+    """Dibuja draw(pdf) dentro de un recuadro; si no cabe en lo que queda de hoja, pasa a la siguiente."""
+    def inner(p):
+        p.set_left_margin(p.l_margin + CARD_PAD)
+        p.set_right_margin(p.r_margin + CARD_PAD)
+        p.set_xy(p.l_margin, p.get_y() + CARD_PAD)
+        draw(p)
+        p.set_left_margin(p.l_margin - CARD_PAD)
+        p.set_right_margin(p.r_margin - CARD_PAD)
+
+    with pdf.offset_rendering() as test:
+        inner(test)
+    if test.page_break_triggered and pdf.get_y() > pdf.t_margin + 1:
+        pdf.add_page()
+
+    page, top = pdf.page, pdf.get_y()
+    inner(pdf)
+    if pdf.page == page:  # una canción más larga que una hoja se queda sin recuadro
+        pdf.set_draw_color(*PDF_BORDER)
+        pdf.rect(pdf.l_margin, top, pdf.epw, pdf.get_y() + CARD_PAD - top,
+                 round_corners=True, corner_radius=3)
+    pdf.set_xy(pdf.l_margin, pdf.get_y() + CARD_PAD + 5)
+
+
+@st.cache_data(ttl="10m")
+def get_sunday_setlist_pdf(sunday_date: str, title: str, with_chords: bool) -> bytes:
+    """PDF del setlist con el mismo diseño de tarjetas que la página; acordes opcionales."""
+    df = get_sunday_setlist(sunday_date)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(*PDF_TEXT)
+    pdf.multi_cell(0, 10, pdf_text(title), new_x="LMARGIN", new_y="NEXT")
+    pdf_empty(pdf, f"{len(df)} canciones")
+    pdf.ln(4)
+
+    for i, row in enumerate(df.itertuples(), 1):
+        pdf_card(pdf, lambda p, row=row, i=i: pdf_song(p, row, i, with_chords))
+
+    return bytes(pdf.output())
+
+
+def clear_sunday_setlist_cache() -> None:
+    """Fuerza a que el setlist y su PDF se vuelvan a generar con los datos actuales."""
+    get_sunday_setlist.clear()
+    get_sunday_setlist_pdf.clear()
 
 
 def show_footer() -> None:

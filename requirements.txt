@@ -1,6 +1,6 @@
-pandas
-psycopg2-binary
-python-dotenv
-streamlit
-sqlalchemy
-matplotlib
+pandas==3.0.5   
+psycopg2-binary==2.9.12
+python-dotenv==1.2.3
+streamlit==1.62.0
+SQLAlchemy==2.0.52
+fpdf2==2.8.9

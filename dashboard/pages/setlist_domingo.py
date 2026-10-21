@@ -6,7 +6,7 @@ project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from models import get_next_sunday_date, get_sunday_setlist, render_song_card, show_footer
+from models import get_next_sunday_date, get_sunday_setlist, get_sunday_setlist_pdf, render_song_card, show_footer
 
 st.set_page_config(page_title="Setlist Domingo", page_icon="🎼")
 
@@ -38,6 +38,15 @@ if df.empty:
     st.info("Todavía no hay setlist registrado para este domingo.")
 else:
     st.caption(f"{len(df)} canciones")
+    col_chords, col_pdf = st.columns(2, vertical_alignment="center")
+    with_chords = col_chords.toggle("Incluir acordes en el PDF")
+    col_pdf.download_button(
+        "📄 Descargar PDF",
+        data=get_sunday_setlist_pdf(sunday_date, f"Setlist para {fecha_larga(sunday_date)}", with_chords),
+        file_name=f"setlist_{sunday_date}.pdf",
+        mime="application/pdf",
+        width="stretch",
+    )
 
 for i, row in enumerate(df.itertuples(), 1):
     render_song_card(row, key=f"setlist_{i}", number=i)
