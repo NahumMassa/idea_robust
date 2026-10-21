@@ -16,7 +16,7 @@ from .models import TONALIDADES, Songs, Artist, Performance, PerformanceElement,
 TIME_FORMAT = "%Y-%m-%d"
 
 # versión de la app (SemVer); se cambia aquí y al crear el tag de git vX.Y.Z
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 # Configuraciones globales predeterminadas de tu app
 DEFAULT_COLUMN_CONFIG = {
