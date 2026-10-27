@@ -212,7 +212,6 @@ class PerformanceElement(Base):
     performance_id = Column(Integer, ForeignKey("performances.id", ondelete="CASCADE"), nullable=False)
     song_id = Column(Integer, ForeignKey("songs.id"), nullable=False)
     song_order = Column(Integer, nullable=False)
-    specific_key = Column(String(10), nullable=True)
 
     # Relaciones para navegar entre objetosz
     performance = relationship("Performance", back_populates="elements")

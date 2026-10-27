@@ -17,7 +17,7 @@ from .models import TONALIDADES, Songs, Artist, Performance, PerformanceElement,
 TIME_FORMAT = "%Y-%m-%d"
 
 # versión de la app (SemVer); se cambia aquí y al crear el tag de git vX.Y.Z
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 
 # Configuraciones globales predeterminadas de tu app
 DEFAULT_COLUMN_CONFIG = {
@@ -112,7 +112,7 @@ def transpose_selector(container, key: str, original_tone: str | None, tone: str
         return tone  # sin tono original válido no hay desde dónde transponer
 
     options = [t for t in TONALIDADES if t.endswith("-") == minor]
-    # se compara por semitono para tolerar specific_key con otra ortografía (C# vs Db)
+    # se compara por semitono para tolerar otra ortografía (C# vs Db)
     try:
         target = parse_tone(tone)[0]
     except (ValueError, AttributeError):
@@ -125,12 +125,10 @@ def transpose_selector(container, key: str, original_tone: str | None, tone: str
 def render_song_card(row, key: str, number: int | None = None) -> None:
     """
     Tarjeta de una canción: título, artista, tono/tempo/compás, estructura y acordes.
-    row necesita title, artist, tempo, tone, link_yt, time_signature, structure y chords;
-    specific_key (tono de ese servicio) es opcional. key debe ser único en la página.
+    row necesita title, artist, tempo, tone, link_yt, time_signature, structure y chords.
+    key debe ser único en la página.
     """
-    original_tone = row.tone if has_value(row.tone) else None
-    specific_key = getattr(row, "specific_key", None)
-    tone = specific_key if has_value(specific_key) else original_tone
+    tone = row.tone if has_value(row.tone) else None
 
     with st.container(border=True):
         col_title, col_link = st.columns([4, 1], vertical_alignment="center")
@@ -142,8 +140,7 @@ def render_song_card(row, key: str, number: int | None = None) -> None:
 
         badges = []
         if tone:
-            note = f" (original {original_tone})" if original_tone and tone != original_tone else ""
-            badges.append(f":orange-badge[🎵 Tono {tone}{note}]")
+            badges.append(f":orange-badge[🎵 Tono {tone}]")
         if has_value(row.tempo):
             badges.append(f":blue-badge[⏱️ {int(row.tempo)} BPM]")
         if has_value(row.time_signature):
@@ -160,8 +157,8 @@ def render_song_card(row, key: str, number: int | None = None) -> None:
         col_label, col_tone = st.columns([3, 1], vertical_alignment="bottom")
         col_label.markdown("**Acordes**")
         if has_value(row.chords):
-            view_tone = transpose_selector(col_tone, key, original_tone, tone)
-            st.code(chords_for_report(row.chords, original_tone, view_tone), language=None)
+            view_tone = transpose_selector(col_tone, key, tone, tone)
+            st.code(chords_for_report(row.chords, tone, view_tone), language=None)
         else:
             st.caption("Sin acordes registrados")
 
@@ -183,7 +180,6 @@ def get_sunday_setlist(sunday_date: str) -> pd.DataFrame:
             Songs.tempo,
             Songs.tone,
             Songs.link_yt,
-            PerformanceElement.specific_key,
             SongChart.time_signature,
             SongChart.structure,
             SongChart.chords,
@@ -246,8 +242,7 @@ def pdf_empty(pdf: FPDF, text: str) -> None:
 
 def pdf_song(pdf: FPDF, row, number: int, with_chords: bool) -> None:
     """Contenido de la tarjeta, igual que render_song_card pero sin YouTube ni selector de tono."""
-    original_tone = row.tone if has_value(row.tone) else None
-    tone = row.specific_key if has_value(row.specific_key) else original_tone
+    tone = row.tone if has_value(row.tone) else None
 
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_text_color(*PDF_TEXT)
@@ -257,8 +252,7 @@ def pdf_song(pdf: FPDF, row, number: int, with_chords: bool) -> None:
 
     badges = []
     if tone:
-        note = f" (original {original_tone})" if original_tone and tone != original_tone else ""
-        badges.append((f"Tono {tone}{note}", PDF_ORANGE))
+        badges.append((f"Tono {tone}", PDF_ORANGE))
     if has_value(row.tempo):
         badges.append((f"{int(row.tempo)} BPM", PDF_BLUE))
     if has_value(row.time_signature):
@@ -291,7 +285,7 @@ def pdf_song(pdf: FPDF, row, number: int, with_chords: bool) -> None:
             pdf.set_font("Courier", "", 9)  # monoespaciada para que los compases se alineen
             pdf.set_fill_color(*PDF_CODE[0])
             pdf.set_text_color(*PDF_TEXT)
-            pdf.multi_cell(0, 4.5, pdf_text(chords_for_report(row.chords, original_tone, tone)),
+            pdf.multi_cell(0, 4.5, pdf_text(chords_for_report(row.chords, tone, tone)),
                            fill=True, padding=3, new_x="LMARGIN", new_y="NEXT")
         else:
             pdf_empty(pdf, "Sin acordes registrados")
